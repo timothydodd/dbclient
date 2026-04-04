@@ -1,0 +1,14 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ae="using:AvaloniaEdit"
+             xmlns:vm="using:dbclient.ViewModels"
+             x:Class="dbclient.Views.EditorView"
+             x:DataType="vm:SessionTabViewModel">
+
+    <ae:TextEditor x:Name="Editor"
+                   HorizontalScrollBarVisibility="Auto"
+                   VerticalScrollBarVisibility="Auto"
+                   WordWrap="False"
+                   FontSize="14"
+                   FontFamily="Consolas, Menlo, monospace"/>
+</UserControl>

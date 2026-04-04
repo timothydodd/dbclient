@@ -1,0 +1,176 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:dbclient.ViewModels"
+        x:Class="dbclient.Views.ConnectionDialog"
+        x:DataType="vm:ConnectionDialogViewModel"
+        Title="New Connection"
+        Width="480"
+        Height="560"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        CanResize="False"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="32">
+
+    <DockPanel>
+        <!-- Title Bar -->
+        <Border DockPanel.Dock="Top"
+                Background="{DynamicResource TitleBarBackground}"
+                Height="32"
+                PointerPressed="TitleBar_PointerPressed">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="New Connection"
+                           Foreground="{DynamicResource TitleBarForeground}"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Margin="12,0"/>
+                <Button Grid.Column="1"
+                        Click="Close_Click"
+                        Width="46" Height="32"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Classes="close">
+                    <Path Data="M18 6 6 18M6 6l12 12"
+                          Stroke="{DynamicResource TitleBarForeground}"
+                          StrokeThickness="1.5"
+                          StrokeLineCap="Round"
+                          Stretch="Uniform"
+                          Width="12" Height="12"/>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Buttons -->
+        <Border DockPanel.Dock="Bottom"
+                Background="{DynamicResource TitleBarBackground}"
+                Padding="12,8">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <TextBlock Text="{Binding StatusMessage}"
+                           Foreground="{DynamicResource AccentColor}"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0"/>
+                <Button Content="Test" Click="Test_Click" Width="80"/>
+                <Button Content="Connect" Click="Connect_Click" Width="80"
+                        Classes="primary"/>
+                <Button Content="Cancel" Click="Close_Click" Width="80"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Form Content -->
+        <ScrollViewer Padding="16,12">
+            <StackPanel Spacing="12">
+                <!-- Connection Type -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Connection Type" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                    <ComboBox SelectedIndex="{Binding ConnectionType}"
+                              HorizontalAlignment="Stretch">
+                        <ComboBoxItem Content="SQL Server"/>
+                        <ComboBoxItem Content="MySQL"/>
+                        <ComboBoxItem Content="SQLite"/>
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Display Name -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Display Name (optional)" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                    <TextBox Text="{Binding DisplayName}" Watermark="My Database"/>
+                </StackPanel>
+
+                <!-- Server Connection Fields -->
+                <StackPanel Spacing="12" IsVisible="{Binding IsServerConnection}">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Server Address" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                        <TextBox Text="{Binding Address}" Watermark="localhost"/>
+                    </StackPanel>
+
+                    <Grid ColumnDefinitions="*,Auto,100">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Username" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                            <TextBox Text="{Binding User}" Watermark="sa"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="4">
+                            <TextBlock Text="Port" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                            <TextBox Text="{Binding Port}" Watermark="default"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Password" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                        <TextBox Text="{Binding Password}" PasswordChar="*"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Database (optional)" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                        <TextBox Text="{Binding Database}" Watermark="Leave blank to browse all"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Connection Timeout (seconds)" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                        <TextBox Text="{Binding ConnectionTimeout}" Watermark="15"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Command Timeout (seconds)" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                        <TextBox Text="{Binding CommandTimeout}" Watermark="30"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- SQLite Fields -->
+                <StackPanel Spacing="12" IsVisible="{Binding IsSqlite}">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Database File" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Browse..." Click="BrowseSqlite_Click" Margin="8,0,0,0"/>
+                            <TextBox Text="{Binding FileName}" Watermark="/path/to/database.db"/>
+                        </DockPanel>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- SSH Section -->
+                <StackPanel Spacing="12" IsVisible="{Binding IsServerConnection}">
+                    <Separator/>
+                    <CheckBox Content="Use SSH Tunnel" IsChecked="{Binding UseSSH}"/>
+                    <StackPanel Spacing="8" IsVisible="{Binding UseSSH}">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="SSH Host" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                            <TextBox Text="{Binding SshHost}"/>
+                        </StackPanel>
+                        <Grid ColumnDefinitions="*,8,*">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="SSH Username" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                                <TextBox Text="{Binding SshUser}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="4">
+                                <TextBlock Text="SSH Password" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                                <TextBox Text="{Binding SshPassword}" PasswordChar="*"/>
+                            </StackPanel>
+                        </Grid>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Remote Port" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                            <TextBox Text="{Binding SshRemotePort}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+
+    <Window.Styles>
+        <Style Selector="Button.close:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#ff5555"/>
+        </Style>
+        <Style Selector="Button.primary /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#bd93f9"/>
+        </Style>
+        <Style Selector="Button.primary">
+            <Setter Property="Foreground" Value="#282a36"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#caa4fa"/>
+        </Style>
+    </Window.Styles>
+</Window>

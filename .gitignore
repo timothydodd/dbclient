@@ -1,0 +1,38 @@
+# Build outputs
+bin/
+obj/
+publish/
+
+# IDE / Editor
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.sln.iml
+*.DotSettings.user
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# NuGet
+*.nupkg
+packages/
+
+# Debug
+*.pdb
+
+# User state (contains encrypted credentials)
+.dbclient/
+
+# Environment / secrets
+.env
+.env.*
+appsettings.*.json
+credentials.json
+*.pfx
+*.key
+*.pem

@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/lib/">
+    <Project Path="lib/dbclient.Data/dbclient.Data.csproj" />
+    <Project Path="lib/dbclient.IntelliSense/dbclient.IntelliSense.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/dbclient/dbclient.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/dbclient.IntelliSense.Tests/dbclient.IntelliSense.Tests.csproj" />
+  </Folder>
+</Solution>

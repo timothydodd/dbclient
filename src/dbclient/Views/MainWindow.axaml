@@ -1,0 +1,313 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:dbclient.ViewModels"
+        xmlns:views="using:dbclient.Views"
+        x:Class="dbclient.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        x:Name="MainWin"
+        Title="dbclient"
+        Width="1400"
+        Height="850"
+        MinWidth="600"
+        MinHeight="400"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="32">
+
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+N" Command="{Binding NewQueryTabCommand}" />
+        <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseQueryTabCommand}" CommandParameter="{Binding SelectedConnectionTab.SelectedQueryTab}" />
+        <KeyBinding Gesture="F5" Command="{Binding ExecuteQueryCommand}" />
+        <KeyBinding Gesture="Ctrl+Return" Command="{Binding ExecuteQueryCommand}" />
+        <KeyBinding Gesture="Ctrl+L" Command="{Binding ToggleConnectionPanelCommand}" />
+        <KeyBinding Gesture="Escape" Command="{Binding CancelQueryCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+F" Command="{Binding FormatQueryCommand}" />
+    </Window.KeyBindings>
+
+    <Panel>
+        <DockPanel>
+            <!-- Custom Title Bar -->
+            <Border DockPanel.Dock="Top"
+                    Background="{DynamicResource TitleBarBackground}"
+                    Height="32">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                    <Path Grid.Column="0"
+                          Data="M12 2C6.48 2 2 4.02 2 6.5v11C2 19.98 6.48 22 12 22s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2zM12 4c4.42 0 8 1.57 8 3.5S16.42 11 12 11 4 9.43 4 7.5 7.58 4 12 4z"
+                          Fill="{DynamicResource AccentColor}"
+                          Stretch="Uniform" Width="16" Height="16"
+                          Margin="10,0,4,0" VerticalAlignment="Center"/>
+
+                    <Menu Grid.Column="1" VerticalAlignment="Center" Background="Transparent">
+                        <MenuItem Header="_File">
+                            <MenuItem Header="New _Connection..." Click="NewConnection_Click">
+                                <MenuItem.Icon>
+                                    <Path Data="M12 2C6.48 2 2 4.02 2 6.5v11C2 19.98 6.48 22 12 22s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2z"
+                                          Fill="{DynamicResource MenuIconColor}" Stretch="Uniform" Width="14" Height="14"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem Header="_New Tab" Command="{Binding NewQueryTabCommand}" InputGesture="Ctrl+N">
+                                <MenuItem.Icon>
+                                    <Path Data="M12 5v14M5 12h14"
+                                          Stroke="{DynamicResource MenuIconColor}" StrokeThickness="1.5" StrokeLineCap="Round" Stretch="Uniform" Width="14" Height="14"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="_Close Tab" Command="{Binding CloseQueryTabCommand}" CommandParameter="{Binding SelectedConnectionTab.SelectedQueryTab}" InputGesture="Ctrl+W">
+                                <MenuItem.Icon>
+                                    <Path Data="M18 6 6 18M6 6l12 12"
+                                          Stroke="{DynamicResource MenuIconColor}" StrokeThickness="1.5" StrokeLineCap="Round" Stretch="Uniform" Width="14" Height="14"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem Header="E_xit" Click="Exit_Click" InputGesture="Alt+F4"/>
+                        </MenuItem>
+                        <MenuItem Header="_Query">
+                            <MenuItem Header="_Execute" Command="{Binding ExecuteQueryCommand}" InputGesture="F5">
+                                <MenuItem.Icon>
+                                    <Path Data="M5 3l14 9-14 9V3z"
+                                          Fill="{DynamicResource MenuIconColor}" Stretch="Uniform" Width="14" Height="14"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="_Cancel" Command="{Binding CancelQueryCommand}" InputGesture="Escape">
+                                <MenuItem.Icon>
+                                    <Path Data="M6 6h12v12H6z"
+                                          Fill="#ff5555" Stretch="Uniform" Width="14" Height="14"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="E_xplain" Command="{Binding ExplainQueryCommand}" InputGesture="Ctrl+E">
+                                <MenuItem.Icon>
+                                    <Path Data="M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"
+                                          Fill="{DynamicResource MenuIconColor}" Stretch="Uniform" Width="14" Height="14"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator/>
+                            <MenuItem Header="_Format SQL" Command="{Binding FormatQueryCommand}" InputGesture="Ctrl+Shift+F">
+                                <MenuItem.Icon>
+                                    <Path Data="M3 4h18v2H3V4zm2 4h14v2H5V8zm-2 4h18v2H3v-2zm2 4h14v2H5v-2z"
+                                          Fill="{DynamicResource MenuIconColor}" Stretch="Uniform" Width="14" Height="14"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator/>
+                            <MenuItem Header="_History" x:Name="HistoryMenu" SubmenuOpened="HistoryMenu_SubmenuOpened">
+                                <MenuItem.Icon>
+                                    <Path Data="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"
+                                          Fill="{DynamicResource MenuIconColor}" Stretch="Uniform" Width="14" Height="14"/>
+                                </MenuItem.Icon>
+                                <MenuItem Header="(empty)" IsEnabled="False"/>
+                            </MenuItem>
+                        </MenuItem>
+                        <MenuItem Header="_View">
+                            <MenuItem Header="_Connection Panel" Command="{Binding ToggleConnectionPanelCommand}" InputGesture="Ctrl+L">
+                                <MenuItem.Icon>
+                                    <CheckBox IsChecked="{Binding IsConnectionPanelOpen}" BorderThickness="0" IsHitTestVisible="False"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator/>
+                            <MenuItem Header="{Binding ThemeDisplayName}" Command="{Binding ToggleThemeCommand}" InputGesture="Ctrl+T"/>
+                        </MenuItem>
+                    </Menu>
+
+                    <Border Grid.Column="2" Background="Transparent" PointerPressed="TitleBar_PointerPressed">
+                        <TextBlock Text="dbclient" Foreground="{DynamicResource SecondaryText}" FontSize="12"
+                                   VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </Border>
+
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Stretch">
+                        <Button Click="Minimize_Click" Width="36" Height="28" Background="Transparent" BorderThickness="0"
+                                VerticalContentAlignment="Center" HorizontalContentAlignment="Center">
+                            <Path Data="M5 12h14" Stroke="{DynamicResource TitleBarForeground}" StrokeThickness="1" StrokeLineCap="Round" Stretch="Fill" Width="10" Height="1"/>
+                        </Button>
+                        <Button Click="MaximizeRestore_Click" Width="36" Height="28" Background="Transparent" BorderThickness="0"
+                                VerticalContentAlignment="Center" HorizontalContentAlignment="Center">
+                            <Path Data="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"
+                                  Stroke="{DynamicResource TitleBarForeground}" StrokeThickness="1" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="10" Height="10"/>
+                        </Button>
+                        <Button Click="Close_Click" Width="36" Height="28" Background="Transparent" BorderThickness="0"
+                                VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Classes="close">
+                            <Path Data="M18 6 6 18M6 6l12 12" Stroke="{DynamicResource TitleBarForeground}" StrokeThickness="1" StrokeLineCap="Round" Stretch="Uniform" Width="10" Height="10"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Status Bar -->
+            <Border DockPanel.Dock="Bottom" Background="{DynamicResource TitleBarBackground}" Height="24" Padding="8,0">
+                <Grid ColumnDefinitions="Auto,*">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
+                        <Path Data="M12 2C6.48 2 2 4.02 2 6.5v11C2 19.98 6.48 22 12 22s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2z"
+                              Fill="{DynamicResource AccentColor}" Stretch="Uniform" Width="10" Height="10"/>
+                        <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource StatusBarText}" FontSize="11"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Spacing="16" HorizontalAlignment="Right">
+                        <TextBlock Text="{Binding ExecutionTimeText}" Foreground="{DynamicResource StatusBarText}" FontSize="11"/>
+                        <TextBlock Text="|" Foreground="{DynamicResource StatusBarSeparator}" FontSize="11"/>
+                        <TextBlock Foreground="{DynamicResource StatusBarText}" FontSize="11">
+                            <Run Text="Ln "/><Run Text="{Binding CursorLine}"/><Run Text=", Col "/><Run Text="{Binding CursorColumn}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Main Content -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="0" MinWidth="0"/>
+                    <ColumnDefinition Width="0"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Left Panel (independent, no tabs over it) -->
+                <views:ConnectionPanel x:Name="ConnectionPanelControl" Grid.Column="0"/>
+
+                <GridSplitter x:Name="ConnectionSplitter" Grid.Column="1" Width="5"
+                              Background="Transparent" ResizeDirection="Columns" IsVisible="False"/>
+
+                <!-- Right side: Connection Tabs + Query Tabs + Editor + Results -->
+                <Grid Grid.Column="2" x:Name="EditorResultsGrid">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="3*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="2*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Connection Tab Strip (over editor area only) -->
+                    <Border Grid.Row="0" Background="{DynamicResource TitleBarBackground}"
+                            IsVisible="{Binding ConnectionTabs.Count}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Click="NewConnection_Click"
+                                    ToolTip.Tip="New Connection"
+                                    MinHeight="28" Padding="8,2"
+                                    VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                    Opacity="0.4" Classes="ghosttab">
+                                <Path Stroke="{DynamicResource TabItemText}" StrokeThickness="1.5" StrokeLineCap="Round"
+                                      Data="M12 5v14M5 12h14" Stretch="Uniform" Width="10" Height="10"/>
+                            </Button>
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                <ListBox x:Name="ConnectionTabStrip"
+                                         ItemsSource="{Binding ConnectionTabs}"
+                                         SelectedItem="{Binding SelectedConnectionTab}"
+                                         Background="Transparent" BorderThickness="0" Padding="0"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate DataType="vm:ConnectionTabViewModel">
+                                            <Grid MinHeight="28" RowDefinitions="*,2">
+                                                <Grid.ContextMenu>
+                                                    <ContextMenu>
+                                                        <MenuItem Header="Close" Click="CloseConnectionTab_Click" Tag="{Binding}"/>
+                                                    </ContextMenu>
+                                                </Grid.ContextMenu>
+                                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4,2,4,2" Spacing="6">
+                                                    <Border Width="4" CornerRadius="2"
+                                                            Background="{Binding TabColor}"
+                                                            VerticalAlignment="Stretch" Margin="0,2"/>
+                                                    <TextBlock Text="{Binding DisplayName}"
+                                                               VerticalAlignment="Center" FontSize="11"/>
+                                                    <Button Click="CloseConnectionTab_Click" Tag="{Binding}"
+                                                            Padding="0" Margin="4,0,0,0"
+                                                            Width="16" Height="16" Background="Transparent"
+                                                            Opacity="0.3" VerticalAlignment="Center"
+                                                            VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                                            Classes="tabclose">
+                                                        <Path Data="M18 6 6 18M6 6l12 12"
+                                                              Stroke="{DynamicResource TabCloseIconColor}"
+                                                              StrokeThickness="2" StrokeLineCap="Round"
+                                                              Stretch="Uniform" Width="6" Height="6"/>
+                                                    </Button>
+                                                </StackPanel>
+                                                <Border Grid.Row="1"
+                                                        Background="{Binding TabColor}"
+                                                        IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Query Sub-Tab Strip -->
+                    <Border Grid.Row="1" Background="{DynamicResource TabStripBackground}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right"
+                                    Command="{Binding NewQueryTabCommand}"
+                                    ToolTip.Tip="New Tab (Ctrl+N)"
+                                    MinHeight="30" Padding="8,4"
+                                    VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                    Opacity="0.35" Classes="ghosttab">
+                                <Path Stroke="{DynamicResource TabItemText}" StrokeThickness="1.5" StrokeLineCap="Round"
+                                      Data="M12 5v14M5 12h14" Stretch="Uniform" Width="11" Height="11" VerticalAlignment="Center"/>
+                            </Button>
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                <ListBox x:Name="TabStrip"
+                                         ItemsSource="{Binding SelectedConnectionTab.QueryTabs}"
+                                         SelectedItem="{Binding SelectedConnectionTab.SelectedQueryTab}"
+                                         Background="Transparent" BorderThickness="0" Padding="0"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate DataType="vm:SessionTabViewModel">
+                                            <Grid MinHeight="30" RowDefinitions="*,2">
+                                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10,4">
+                                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center" FontSize="11"/>
+                                                    <TextBlock Text="*" FontSize="11" Foreground="{DynamicResource AccentColor}"
+                                                               VerticalAlignment="Center" Margin="3,0,0,0" IsVisible="{Binding IsDirty}"/>
+                                                    <Button Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CloseQueryTabCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            Padding="0" Margin="6,0,0,0" Width="18" Height="18"
+                                                            Background="Transparent" Opacity="0.3"
+                                                            VerticalAlignment="Center" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                                            Classes="tabclose">
+                                                        <Path Data="M18 6 6 18M6 6l12 12" Stroke="{DynamicResource TabCloseIconColor}"
+                                                              StrokeThickness="2" StrokeLineCap="Round" Stretch="Uniform" Width="7" Height="7"/>
+                                                    </Button>
+                                                </StackPanel>
+                                                <Border Grid.Row="1" Background="{DynamicResource AccentColor}"
+                                                        IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- SQL Editor -->
+                    <ContentControl Grid.Row="2" Content="{Binding SelectedConnectionTab.SelectedQueryTab}">
+                        <ContentControl.ContentTemplate>
+                            <DataTemplate DataType="vm:SessionTabViewModel">
+                                <views:EditorView DataContext="{Binding}" />
+                            </DataTemplate>
+                        </ContentControl.ContentTemplate>
+                    </ContentControl>
+
+                    <!-- Horizontal Splitter -->
+                    <GridSplitter Grid.Row="3" Height="5" ResizeDirection="Rows" HorizontalAlignment="Stretch"/>
+
+                    <!-- Results Panel -->
+                    <views:ResultsPanel Grid.Row="4" DataContext="{Binding SelectedConnectionTab.SelectedQueryTab}"/>
+                </Grid>
+            </Grid>
+        </DockPanel>
+    </Panel>
+
+    <Window.Styles>
+        <Style Selector="Button.close:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#ff5555"/>
+        </Style>
+        <Style Selector="StackPanel > Button:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource WindowControlHover}"/>
+        </Style>
+        <Style Selector="Button.tabclose:pointerover">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+    </Window.Styles>
+</Window>

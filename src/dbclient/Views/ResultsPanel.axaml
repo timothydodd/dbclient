@@ -1,0 +1,145 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:dbclient.ViewModels"
+             x:Class="dbclient.Views.ResultsPanel"
+             x:DataType="vm:SessionTabViewModel">
+
+    <Border Background="{DynamicResource ResultsBackground}">
+        <DockPanel>
+            <!-- Results header bar -->
+            <Border DockPanel.Dock="Top"
+                    Background="{DynamicResource PanelHeaderBackground}"
+                    Padding="10,4"
+                    Height="28">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2">
+                        <Button x:Name="ApplyBtn" Click="Apply_Click"
+                                Background="Transparent" BorderThickness="0"
+                                Padding="6,2" IsVisible="False" Opacity="0.9"
+                                ToolTip.Tip="Apply Changes">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <Path Data="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
+                                      Fill="#50fa7b" Stretch="Uniform" Width="10" Height="10"/>
+                                <TextBlock Text="Apply" FontSize="10" Foreground="#50fa7b" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="DiscardBtn" Click="Discard_Click"
+                                Background="Transparent" BorderThickness="0"
+                                Padding="6,2" IsVisible="False" Opacity="0.9"
+                                ToolTip.Tip="Discard Changes">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <Path Data="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                                      Fill="#ff5555" Stretch="Uniform" Width="10" Height="10"/>
+                                <TextBlock Text="Discard" FontSize="10" Foreground="#ff5555" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Click="CopyAll_Click"
+                                Background="Transparent" BorderThickness="0"
+                                Padding="4,2" ToolTip.Tip="Copy All Rows" Opacity="0.5">
+                            <Path Data="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"
+                                  Fill="{DynamicResource MenuIconColor}" Stretch="Uniform" Width="10" Height="10"/>
+                        </Button>
+                        <Button Click="ExportCsv_Click"
+                                Background="Transparent" BorderThickness="0"
+                                Padding="4,2" ToolTip.Tip="Export CSV" Opacity="0.5">
+                            <Path Data="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"
+                                  Fill="{DynamicResource MenuIconColor}" Stretch="Uniform" Width="10" Height="10"/>
+                        </Button>
+                        <Button IsVisible="{Binding IsExecuting}"
+                                Click="Cancel_Click"
+                                Background="Transparent" BorderThickness="0"
+                                Padding="4,2" ToolTip.Tip="Cancel Query (Escape)">
+                            <Path Data="M6 6h12v12H6z" Fill="#ff5555" Stretch="Uniform" Width="10" Height="10"/>
+                        </Button>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="Results"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource PanelHeaderText}"
+                                   Opacity="0.7"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding RowCountText}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource SecondaryText}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- Result set tabs (visible when multiple result sets) -->
+            <Border DockPanel.Dock="Top" x:Name="ResultSetTabStrip"
+                    Background="{DynamicResource TabStripBackground}"
+                    IsVisible="False" Padding="4,2">
+                <StackPanel x:Name="ResultSetTabs" Orientation="Horizontal" Spacing="2"/>
+            </Border>
+
+            <!-- Messages area -->
+            <Border DockPanel.Dock="Bottom"
+                    Background="#1a1b24"
+                    Padding="10,6"
+                    IsVisible="{Binding HasMessage}"
+                    MaxHeight="100">
+                <ScrollViewer>
+                    <TextBlock Text="{Binding Message}"
+                               FontSize="12"
+                               FontFamily="Consolas"
+                               Foreground="{Binding MessageColor}"
+                               TextWrapping="Wrap"/>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Search bar -->
+            <Border DockPanel.Dock="Top" x:Name="SearchBar"
+                    Background="{DynamicResource PanelHeaderBackground}"
+                    Padding="4,2" IsVisible="False">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Click="ClearSearch_Click"
+                            Background="Transparent" BorderThickness="0" Padding="4,0"
+                            ToolTip.Tip="Clear search">
+                        <Path Data="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                              Fill="{DynamicResource SecondaryText}" Stretch="Uniform" Width="8" Height="8"/>
+                    </Button>
+                    <TextBox x:Name="SearchBox"
+                             Watermark="Filter results..."
+                             FontSize="11" Height="24"
+                             BorderThickness="0"
+                             Background="Transparent"/>
+                </DockPanel>
+            </Border>
+
+            <!-- Results DataGrid -->
+            <DataGrid x:Name="ResultsGrid"
+                      IsReadOnly="False"
+                      CanUserResizeColumns="True"
+                      CanUserSortColumns="True"
+                      SelectionMode="Extended"
+                      ClipboardCopyMode="None"
+                      GridLinesVisibility="All"
+                      FontSize="11"
+                      FontFamily="Consolas, Menlo, monospace"
+                      BorderThickness="0">
+                <DataGrid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Copy Cell" Click="CopyCell_Click" InputGesture="Ctrl+C"/>
+                        <MenuItem Header="Copy Row" Click="CopySelected_Click" InputGesture="Ctrl+Shift+C"/>
+                        <MenuItem Header="Copy All Rows" Click="CopyAll_Click"/>
+                        <Separator/>
+                        <MenuItem Header="Export to CSV..." Click="ExportCsv_Click"/>
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+                <DataGrid.Styles>
+                    <Style Selector="ScrollBar">
+                        <Setter Property="AllowAutoHide" Value="False"/>
+                    </Style>
+                    <Style Selector="ScrollBar:vertical">
+                        <Setter Property="Width" Value="14"/>
+                    </Style>
+                    <Style Selector="ScrollBar:horizontal">
+                        <Setter Property="Height" Value="14"/>
+                    </Style>
+                </DataGrid.Styles>
+            </DataGrid>
+        </DockPanel>
+    </Border>
+</UserControl>

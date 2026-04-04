@@ -1,0 +1,91 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:dbclient.ViewModels"
+             xmlns:models="using:dbclient.Models"
+             x:Class="dbclient.Views.ConnectionPanel">
+
+    <Border Background="{DynamicResource PanelBackground}">
+        <Panel>
+            <!-- Main content: Schema tree -->
+            <DockPanel x:Name="SchemaView">
+                <Border DockPanel.Dock="Top" Background="{DynamicResource PanelHeaderBackground}" Padding="10,6">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Click="ToggleConnectionsOverlay_Click"
+                                Background="Transparent" Padding="2" Width="22" Height="22" ToolTip.Tip="Connections">
+                            <Path Data="M12 2C6.48 2 2 4.02 2 6.5v11C2 19.98 6.48 22 12 22s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2z"
+                                  Fill="{DynamicResource MenuIconColor}" Stretch="Uniform" Width="11" Height="11"/>
+                        </Button>
+                        <Button DockPanel.Dock="Right" Click="RefreshSchema_Click"
+                                Background="Transparent" Padding="2" Width="22" Height="22" ToolTip.Tip="Refresh Schema">
+                            <Path Data="M17.65 6.35A7.96 7.96 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+                                  Fill="{DynamicResource MenuIconColor}" Stretch="Uniform" Width="11" Height="11"/>
+                        </Button>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Path Data="M3 3h18v18H3z" Stroke="{DynamicResource AccentColor}" StrokeThickness="1.5"
+                                  Stretch="Uniform" Width="12" Height="12" VerticalAlignment="Center"/>
+                            <TextBlock Text="SCHEMA" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource PanelHeaderText}" Opacity="0.7" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- Schema Tree - bound directly, no chained path -->
+                <TreeView x:Name="SchemaTree"
+                          Background="Transparent" BorderThickness="0" Padding="2"
+                          SelectionChanged="SchemaTree_SelectionChanged"
+                          KeyDown="SchemaTree_KeyDown">
+                    <TreeView.ItemTemplate>
+                        <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="vm:ConnectionTreeNode">
+                            <StackPanel Orientation="Horizontal" Spacing="4" Margin="-8,0,0,0"
+                                        DoubleTapped="TreeItem_DoubleTapped"
+                                        PointerPressed="TreeItem_PointerPressed"
+                                        Tag="{Binding}">
+                                <TextBlock Text="{Binding Name}" FontSize="11"
+                                           Foreground="{Binding NameColor}"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding Detail}" FontSize="9"
+                                           Foreground="{DynamicResource SecondaryText}"
+                                           VerticalAlignment="Center" IsVisible="{Binding Detail.Length}"/>
+                            </StackPanel>
+                        </TreeDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
+            </DockPanel>
+
+            <!-- Connections overlay -->
+            <Border x:Name="ConnectionsOverlay" IsVisible="False" Background="{DynamicResource PanelBackground}">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top" Background="{DynamicResource PanelHeaderBackground}" Padding="10,6">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Click="ToggleConnectionsOverlay_Click"
+                                    Background="Transparent" Padding="2" Width="22" Height="22" ToolTip.Tip="Close">
+                                <Path Data="M18 6 6 18M6 6l12 12" Stroke="{DynamicResource MenuIconColor}"
+                                      StrokeThickness="1.5" StrokeLineCap="Round" Stretch="Uniform" Width="10" Height="10"/>
+                            </Button>
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Path Data="M12 2C6.48 2 2 4.02 2 6.5v11C2 19.98 6.48 22 12 22s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2z"
+                                      Fill="{DynamicResource AccentColor}" Stretch="Uniform" Width="12" Height="12" VerticalAlignment="Center"/>
+                                <TextBlock Text="CONNECTIONS" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PanelHeaderText}" Opacity="0.7" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <Border DockPanel.Dock="Top" Padding="8,6">
+                        <Button Click="NewConnection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8,6">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Path Data="M12 5v14M5 12h14" Stroke="{DynamicResource TitleBarForeground}"
+                                      StrokeThickness="1.5" StrokeLineCap="Round" Stretch="Uniform" Width="11" Height="11" VerticalAlignment="Center"/>
+                                <TextBlock Text="New Connection" FontSize="11" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </Border>
+
+                    <Separator DockPanel.Dock="Top"/>
+
+                    <ScrollViewer x:Name="SavedConnectionsList"/>
+                </DockPanel>
+            </Border>
+        </Panel>
+    </Border>
+</UserControl>

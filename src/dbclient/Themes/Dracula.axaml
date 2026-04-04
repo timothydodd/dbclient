@@ -1,0 +1,406 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ae="using:AvaloniaEdit"
+        x:Class="dbclient.Themes.DraculaTheme">
+
+    <Styles.Resources>
+        <!-- Title bar / Status bar -->
+        <SolidColorBrush x:Key="TitleBarBackground" Color="#21222c"/>
+        <SolidColorBrush x:Key="TitleBarForeground" Color="#f8f8f2"/>
+        <SolidColorBrush x:Key="StatusBarText" Color="#6272a4"/>
+        <SolidColorBrush x:Key="StatusBarSeparator" Color="#44475a"/>
+        <SolidColorBrush x:Key="WindowControlHover" Color="#44475a"/>
+
+        <!-- Accent / UI -->
+        <SolidColorBrush x:Key="AccentColor" Color="#bd93f9"/>
+        <SolidColorBrush x:Key="SecondaryText" Color="#6272a4"/>
+        <SolidColorBrush x:Key="WarningColor" Color="#ffb86c"/>
+
+        <!-- Tab strip -->
+        <SolidColorBrush x:Key="TabStripBackground" Color="#1a1b24"/>
+        <SolidColorBrush x:Key="TabItemBackground" Color="#1a1b24"/>
+        <SolidColorBrush x:Key="TabItemHover" Color="#44475a"/>
+        <SolidColorBrush x:Key="TabItemSelected" Color="#282a36"/>
+        <SolidColorBrush x:Key="TabItemSelectedText" Color="#f8f8f2"/>
+        <SolidColorBrush x:Key="TabItemText" Color="#808080"/>
+
+        <!-- Panels -->
+        <SolidColorBrush x:Key="PanelBackground" Color="#21222c"/>
+        <SolidColorBrush x:Key="PanelBorder" Color="#44475a"/>
+        <SolidColorBrush x:Key="PanelHeaderBackground" Color="#282a36"/>
+        <SolidColorBrush x:Key="PanelHeaderText" Color="#f8f8f2"/>
+
+        <!-- Icons -->
+        <SolidColorBrush x:Key="MenuIconColor" Color="#6272a4"/>
+        <SolidColorBrush x:Key="TabCloseIconColor" Color="#f8f8f2"/>
+
+        <!-- DB-specific: Completion window -->
+        <SolidColorBrush x:Key="CompletionBackground" Color="#21222c"/>
+        <SolidColorBrush x:Key="CompletionBorder" Color="#44475a"/>
+        <SolidColorBrush x:Key="CompletionSelected" Color="#44475a"/>
+        <SolidColorBrush x:Key="KeywordColor" Color="#ff79c6"/>
+        <SolidColorBrush x:Key="TableColor" Color="#8be9fd"/>
+        <SolidColorBrush x:Key="ColumnColor" Color="#50fa7b"/>
+        <SolidColorBrush x:Key="AliasColor" Color="#ffb86c"/>
+
+        <!-- Message colors -->
+        <SolidColorBrush x:Key="ErrorColor" Color="#ff5555"/>
+        <SolidColorBrush x:Key="SuccessColor" Color="#50fa7b"/>
+        <SolidColorBrush x:Key="InfoColor" Color="#6272a4"/>
+        <SolidColorBrush x:Key="NormalText" Color="#f8f8f2"/>
+        <SolidColorBrush x:Key="MutedText" Color="#808080"/>
+        <SolidColorBrush x:Key="CompletionText" Color="#f8f8f2"/>
+        <SolidColorBrush x:Key="CompletionDescText" Color="#6272a4"/>
+
+        <!-- Tree node colors -->
+        <SolidColorBrush x:Key="DatabaseNodeColor" Color="#bd93f9"/>
+        <SolidColorBrush x:Key="FolderNodeColor" Color="#6272a4"/>
+        <SolidColorBrush x:Key="TableNodeColor" Color="#8be9fd"/>
+        <SolidColorBrush x:Key="ViewNodeColor" Color="#50fa7b"/>
+        <SolidColorBrush x:Key="ProcNodeColor" Color="#ffb86c"/>
+        <SolidColorBrush x:Key="ColumnNodeColor" Color="#f8f8f2"/>
+        <SolidColorBrush x:Key="DefaultNodeColor" Color="#f8f8f2"/>
+
+        <!-- DB-specific: Results grid -->
+        <SolidColorBrush x:Key="ResultsBackground" Color="#1E1F29"/>
+        <SolidColorBrush x:Key="ResultsHeaderBackground" Color="#282a36"/>
+        <SolidColorBrush x:Key="ResultsAlternateRow" Color="#242530"/>
+        <SolidColorBrush x:Key="ResultsGridLine" Color="#333445"/>
+
+        <!-- DB-specific: Connection tree -->
+        <SolidColorBrush x:Key="TreeBackground" Color="#21222c"/>
+        <SolidColorBrush x:Key="TreeItemHover" Color="#383a46"/>
+        <SolidColorBrush x:Key="TreeItemSelected" Color="#44475a"/>
+        <SolidColorBrush x:Key="DatabaseIcon" Color="#bd93f9"/>
+        <SolidColorBrush x:Key="TableIcon" Color="#8be9fd"/>
+        <SolidColorBrush x:Key="ColumnIcon" Color="#50fa7b"/>
+    </Styles.Resources>
+
+    <Style Selector="Window">
+        <Setter Property="Background" Value="#282a36"/>
+        <Setter Property="Foreground" Value="#f8f8f2"/>
+    </Style>
+
+    <Style Selector="ae|TextEditor">
+        <Setter Property="Background" Value="#1E1F29"/>
+        <Setter Property="Foreground" Value="#e0e0e0"/>
+        <Setter Property="LineNumbersForeground" Value="#6272a4"/>
+        <Setter Property="FontFamily" Value="Consolas"/>
+        <Setter Property="ShowLineNumbers" Value="True"/>
+        <Setter Property="Padding" Value="8,10,10,10"/>
+        <Setter Property="SearchResultsBrush" Value="#5A4020"/>
+    </Style>
+
+    <Style Selector="Button">
+        <Setter Property="Background" Value="#44475a"/>
+        <Setter Property="Foreground" Value="#f8f8f2"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="10,5"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="FontSize" Value="12"/>
+    </Style>
+
+    <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#44475a"/>
+    </Style>
+
+    <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#5a5e73"/>
+    </Style>
+
+    <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="#6272a4"/>
+    </Style>
+
+    <Style Selector="Menu">
+        <Setter Property="Background" Value="#21222c"/>
+        <Setter Property="Foreground" Value="#f8f8f2"/>
+    </Style>
+
+    <Style Selector="MenuItem">
+        <Setter Property="Background" Value="#21222c"/>
+        <Setter Property="Foreground" Value="#f8f8f2"/>
+    </Style>
+
+    <Style Selector="MenuItem:selected /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="#44475a"/>
+    </Style>
+
+    <Style Selector="ContextMenu">
+        <Setter Property="Background" Value="#21222c"/>
+        <Setter Property="BorderBrush" Value="#44475a"/>
+    </Style>
+
+    <!-- Scrollbar: always visible thumb, no expand animation -->
+    <Style Selector="ScrollBar">
+        <Setter Property="Background" Value="#21222c"/>
+        <Setter Property="AllowAutoHide" Value="False"/>
+    </Style>
+
+    <Style Selector="ScrollBar /template/ Thumb">
+        <Setter Property="Background" Value="#44475a"/>
+        <Setter Property="MinWidth" Value="10"/>
+        <Setter Property="MinHeight" Value="10"/>
+    </Style>
+
+    <Style Selector="ScrollBar:vertical">
+        <Setter Property="Width" Value="14"/>
+    </Style>
+
+    <Style Selector="ScrollBar:horizontal">
+        <Setter Property="Height" Value="14"/>
+    </Style>
+
+    <Style Selector="ScrollBar /template/ Thumb:pointerover">
+        <Setter Property="Background" Value="#6272a4"/>
+    </Style>
+
+    <Style Selector="TextBox">
+        <Setter Property="Background" Value="#44475a"/>
+        <Setter Property="Foreground" Value="#f8f8f2"/>
+        <Setter Property="BorderBrush" Value="#6272a4"/>
+        <Setter Property="CaretBrush" Value="#f8f8f2"/>
+        <Setter Property="SelectionBrush" Value="#6272a4"/>
+    </Style>
+
+    <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+        <Setter Property="BorderBrush" Value="#bd93f9"/>
+    </Style>
+
+    <Style Selector="TextBlock">
+        <Setter Property="Foreground" Value="#f8f8f2"/>
+    </Style>
+
+    <Style Selector="TreeView">
+        <Setter Property="Background" Value="#21222c"/>
+    </Style>
+
+    <Style Selector="TreeViewItem">
+        <Setter Property="Foreground" Value="#f8f8f2"/>
+        <Setter Property="MinHeight" Value="22"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="FontSize" Value="12"/>
+    </Style>
+
+    <Style Selector="TreeViewItem /template/ Border#PART_LayoutRoot">
+        <Setter Property="MinHeight" Value="20"/>
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="TreeViewItem:selected /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="#30bd93f9"/>
+    </Style>
+
+    <Style Selector="TreeViewItem:pointerover /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="#20f8f8f2"/>
+    </Style>
+
+    <Style Selector="TreeViewItem:selected:pointerover /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="#40bd93f9"/>
+    </Style>
+
+    <Style Selector="TreeViewItem:selected /template/ ContentPresenter#PART_HeaderPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="TreeViewItem:pointerover /template/ ContentPresenter#PART_HeaderPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <!-- Compact tree chevron -->
+    <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron">
+        <Setter Property="Width" Value="14"/>
+        <Setter Property="Height" Value="14"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+    </Style>
+
+    <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron /template/ Border">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Width" Value="14"/>
+    </Style>
+
+    <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron /template/ Path">
+        <Setter Property="Width" Value="7"/>
+        <Setter Property="Height" Value="7"/>
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="Fill" Value="#908caa"/>
+    </Style>
+
+    <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron:pointerover /template/ Path">
+        <Setter Property="Fill" Value="#f8f8f2"/>
+    </Style>
+
+
+    <!-- Connection tab strip styles -->
+    <Style Selector="ListBox#ConnectionTabStrip">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="ListBox#ConnectionTabStrip ListBoxItem">
+        <Setter Property="Background" Value="#1a1b24"/>
+        <Setter Property="Foreground" Value="#808080"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="MinHeight" Value="28"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="ListBox#ConnectionTabStrip ListBoxItem /template/ ContentPresenter">
+        <Setter Property="Background" Value="#1a1b24"/>
+    </Style>
+
+    <Style Selector="ListBox#ConnectionTabStrip ListBoxItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#333445"/>
+    </Style>
+
+    <Style Selector="ListBox#ConnectionTabStrip ListBoxItem:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="#282a36"/>
+    </Style>
+
+    <Style Selector="ListBox#ConnectionTabStrip ListBoxItem:selected TextBlock">
+        <Setter Property="Foreground" Value="#f8f8f2"/>
+    </Style>
+
+    <Style Selector="ListBox#ConnectionTabStrip ListBoxItem TextBlock">
+        <Setter Property="Foreground" Value="#808080"/>
+    </Style>
+
+    <Style Selector="ListBox#ConnectionTabStrip ListBoxItem:pointerover TextBlock">
+        <Setter Property="Foreground" Value="#f8f8f2"/>
+    </Style>
+
+    <!-- Query tab strip styles -->
+    <Style Selector="ListBox#TabStrip">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="ListBox#TabStrip ListBoxItem">
+        <Setter Property="Background" Value="{DynamicResource TabItemBackground}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TabItemText}"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="MinHeight" Value="30"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="ListBox#TabStrip ListBoxItem /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource TabItemBackground}"/>
+    </Style>
+
+    <Style Selector="ListBox#TabStrip ListBoxItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource TabItemHover}"/>
+    </Style>
+
+    <Style Selector="ListBox#TabStrip ListBoxItem:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource TabItemSelected}"/>
+    </Style>
+
+    <Style Selector="ListBox#TabStrip ListBoxItem:selected TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TabItemSelectedText}"/>
+    </Style>
+
+    <Style Selector="ListBox#TabStrip ListBoxItem TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TabItemText}"/>
+    </Style>
+
+    <Style Selector="ListBox#TabStrip ListBoxItem:pointerover TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TabItemSelectedText}"/>
+    </Style>
+
+    <!-- Ghost tab button -->
+    <Style Selector="Button.ghosttab">
+        <Setter Property="Background" Value="{DynamicResource TabItemBackground}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TabItemText}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+    </Style>
+
+    <Style Selector="Button.ghosttab /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource TabItemBackground}"/>
+        <Setter Property="CornerRadius" Value="0"/>
+    </Style>
+
+    <Style Selector="Button.ghosttab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource TabItemHover}"/>
+    </Style>
+
+    <!-- DataGrid styles: compact rows -->
+    <Style Selector="DataGrid">
+        <Setter Property="Background" Value="#1E1F29"/>
+        <Setter Property="RowBackground" Value="#1E1F29"/>
+        <Setter Property="BorderBrush" Value="#333445"/>
+        <Setter Property="HorizontalGridLinesBrush" Value="#333445"/>
+        <Setter Property="VerticalGridLinesBrush" Value="#333445"/>
+        <Setter Property="RowHeight" Value="24"/>
+    </Style>
+
+    <Style Selector="DataGridColumnHeader">
+        <Setter Property="Background" Value="#282a36"/>
+        <Setter Property="Foreground" Value="#f8f8f2"/>
+        <Setter Property="MinHeight" Value="26"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="SeparatorBrush" Value="#44475a"/>
+        <Setter Property="AreSeparatorsVisible" Value="False"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Grid ColumnDefinitions="*,4">
+                    <ContentPresenter Grid.Column="0"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Center"
+                                      Margin="4,2"/>
+                    <Thumb Grid.Column="1"
+                           Name="PART_ColumnHeaderGripper"
+                           Background="Transparent"
+                           Cursor="SizeWestEast"
+                           Width="4"/>
+                    <Border Grid.Column="0" Grid.ColumnSpan="2"
+                            BorderBrush="{DynamicResource PanelBorder}"
+                            BorderThickness="0,0,1,1"/>
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <Style Selector="DataGridRow">
+        <Setter Property="Foreground" Value="#e0e0e0"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="MinHeight" Value="22"/>
+    </Style>
+
+    <Style Selector="DataGridCell">
+        <Setter Property="Foreground" Value="#e0e0e0"/>
+        <Setter Property="Padding" Value="6,1"/>
+        <Setter Property="FontSize" Value="11"/>
+    </Style>
+
+    <Style Selector="DataGridCell TextBlock">
+        <Setter Property="Foreground" Value="#e0e0e0"/>
+        <Setter Property="FontSize" Value="11"/>
+    </Style>
+
+    <Style Selector="DataGridCell ContentPresenter">
+        <Setter Property="Foreground" Value="#e0e0e0"/>
+    </Style>
+
+    <!-- GridSplitter -->
+    <Style Selector="GridSplitter">
+        <Setter Property="Background" Value="#333445"/>
+    </Style>
+
+    <Style Selector="GridSplitter:pointerover">
+        <Setter Property="Background" Value="#44475a"/>
+    </Style>
+
+    <Style Selector="Separator">
+        <Setter Property="Background" Value="#44475a"/>
+        <Setter Property="Height" Value="1"/>
+        <Setter Property="Margin" Value="0,4"/>
+    </Style>
+</Styles>

@@ -1,0 +1,88 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="dbclient.Views.ApplyChangesDialog"
+        Title="Apply Changes"
+        Width="600"
+        Height="400"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        CanResize="True"
+        MinWidth="400"
+        MinHeight="250"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="32">
+
+    <DockPanel>
+        <!-- Title Bar -->
+        <Border DockPanel.Dock="Top"
+                Background="{DynamicResource TitleBarBackground}"
+                Height="32"
+                PointerPressed="TitleBar_PointerPressed">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="Apply Changes"
+                           Foreground="{DynamicResource TitleBarForeground}"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Margin="12,0"/>
+                <Button Grid.Column="1"
+                        Click="Cancel_Click"
+                        Width="46" Height="32"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Classes="close">
+                    <Path Data="M18 6 6 18M6 6l12 12"
+                          Stroke="{DynamicResource TitleBarForeground}"
+                          StrokeThickness="1.5"
+                          StrokeLineCap="Round"
+                          Stretch="Uniform"
+                          Width="12" Height="12"/>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Buttons -->
+        <Border DockPanel.Dock="Bottom"
+                Background="{DynamicResource TitleBarBackground}"
+                Padding="12,8">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <TextBlock Text="Review the SQL below before executing"
+                           Foreground="{DynamicResource SecondaryText}"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0"/>
+                <Button Content="Execute" Click="Execute_Click" Width="80"
+                        Classes="primary"/>
+                <Button Content="Cancel" Click="Cancel_Click" Width="80"/>
+            </StackPanel>
+        </Border>
+
+        <!-- SQL Text -->
+        <TextBox x:Name="SqlTextBox"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 FontFamily="Consolas, Menlo, monospace"
+                 FontSize="13"
+                 Padding="12,8"
+                 Background="{DynamicResource EditorBackground}"
+                 Foreground="{DynamicResource EditorForeground}"
+                 BorderThickness="0"/>
+    </DockPanel>
+
+    <Window.Styles>
+        <Style Selector="Button.close:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#ff5555"/>
+        </Style>
+        <Style Selector="Button.primary /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#bd93f9"/>
+        </Style>
+        <Style Selector="Button.primary">
+            <Setter Property="Foreground" Value="#282a36"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#caa4fa"/>
+        </Style>
+    </Window.Styles>
+</Window>
