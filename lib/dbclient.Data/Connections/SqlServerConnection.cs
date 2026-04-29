@@ -10,6 +10,7 @@ public class SqlServerConnection : ConnectionBase
     public override string ConnectionType => "SQL Server";
 
     public bool Encrypted { get; set; }
+    public SqlServerAuthMode AuthMode { get; set; } = SqlServerAuthMode.SqlLogin;
 
     public override async Task<IDbConnection> GetConnectionAsync(string database, CancellationToken ct = default)
     {
@@ -148,8 +149,24 @@ public class SqlServerConnection : ConnectionBase
         else if (!string.IsNullOrWhiteSpace(Port))
             portPart = $",{Port}";
 
-        return $"Server={Address}{portPart};Database={database};User ID={User};Password={Password};" +
-               $"Connection Timeout={ConnectionTimeout};TrustServerCertificate=True;" +
+        var baseStr = $"Server={Address}{portPart};Database={database};" +
+                      $"Connection Timeout={ConnectionTimeout};TrustServerCertificate=True;";
+
+        if (AuthMode == SqlServerAuthMode.AzureDefault)
+        {
+            // DefaultAzureCredential chain: env vars, managed identity, VS, VS Code, az CLI, etc.
+            // Encryption is required for Azure SQL.
+            return baseStr + "Authentication=Active Directory Default;Encrypt=True;";
+        }
+
+        return baseStr +
+               $"User ID={User};Password={Password};" +
                (Encrypted ? "Encrypt=True;" : "");
     }
+}
+
+public enum SqlServerAuthMode
+{
+    SqlLogin,
+    AzureDefault
 }

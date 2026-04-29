@@ -47,7 +47,13 @@ public partial class App : Application
         if (_theme != null)
             Styles.Remove(_theme);
 
-        _theme = themeName == "Dracula" ? new DraculaTheme() : new DarkTheme();
+        _theme = themeName switch
+        {
+            "Dracula" => new DraculaTheme(),
+            "Light" => new LightTheme(),
+            _ => new DarkTheme()
+        };
         Styles.Add(_theme);
+        Services.ThemeColors.NotifyThemeChanged();
     }
 }

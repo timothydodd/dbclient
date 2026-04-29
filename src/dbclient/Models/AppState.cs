@@ -6,9 +6,10 @@ public class AppState
 {
     public int Version { get; set; } = 1;
     public List<ConnectionConfig> SavedConnections { get; set; } = new();
-    public List<ConnectionTabState> ConnectionTabs { get; set; } = new();
+    public List<string> OpenConnectionIds { get; set; } = new();
     public string? ActiveConnectionTabId { get; set; }
     public bool IsConnectionPanelOpen { get; set; } = true;
+    public bool IsHistoryPanelOpen { get; set; }
     public string Theme { get; set; } = "Dark";
 }
 
@@ -19,6 +20,7 @@ public class ConnectionTabState
     public string ActiveDatabase { get; set; } = "";
     public List<TabState> QueryTabs { get; set; } = new();
     public string? ActiveQueryTabId { get; set; }
+    public Dictionary<string, string?> ActiveQueryTabByDatabase { get; set; } = new();
 }
 
 public class TabState
@@ -27,12 +29,14 @@ public class TabState
     public string Title { get; set; } = "";
     public string QueryText { get; set; } = "";
     public int Order { get; set; }
+    public string Database { get; set; } = "";
 }
 
 public class StateService
 {
     private static readonly string StateDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".dbclient");
+    private static readonly string ConnectionsDir = Path.Combine(StateDir, "connections");
     private static readonly string StateFile = Path.Combine(StateDir, "state.json");
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -54,9 +58,8 @@ public class StateService
                     Services.AppLogger.Warn("State file deserialized to null, using defaults");
                     return new AppState();
                 }
-                // Ensure collections are never null (guards against corrupted state files)
                 state.SavedConnections ??= new();
-                state.ConnectionTabs ??= new();
+                state.OpenConnectionIds ??= new();
                 DecryptPasswords(state);
                 return state;
             }
@@ -73,9 +76,68 @@ public class StateService
             EncryptPasswords(state);
             var json = JsonSerializer.Serialize(state, JsonOptions);
             File.WriteAllText(StateFile, json);
-            DecryptPasswords(state); // Restore in-memory values to plaintext
+            DecryptPasswords(state);
         }
         catch (Exception ex) { Services.AppLogger.Error("Failed to save state", ex); }
+    }
+
+    public ConnectionTabState? LoadConnectionState(string connectionId)
+    {
+        try
+        {
+            var file = Path.Combine(ConnectionsDir, $"{connectionId}.json");
+            if (File.Exists(file))
+            {
+                var json = File.ReadAllText(file);
+                var state = JsonSerializer.Deserialize<ConnectionTabState>(json, JsonOptions);
+                if (state != null)
+                {
+                    state.QueryTabs ??= new();
+                    state.ActiveQueryTabByDatabase ??= new();
+
+                    // Migrate tabs without a database to the connection's ActiveDatabase
+                    // (which represents the first/last-used database for this connection).
+                    foreach (var t in state.QueryTabs)
+                        if (string.IsNullOrEmpty(t.Database))
+                            t.Database = state.ActiveDatabase;
+
+                    // Migrate legacy ActiveQueryTabId into the per-database map
+                    if (!string.IsNullOrEmpty(state.ActiveQueryTabId)
+                        && !string.IsNullOrEmpty(state.ActiveDatabase)
+                        && !state.ActiveQueryTabByDatabase.ContainsKey(state.ActiveDatabase))
+                    {
+                        state.ActiveQueryTabByDatabase[state.ActiveDatabase] = state.ActiveQueryTabId;
+                    }
+
+                    return state;
+                }
+            }
+        }
+        catch (Exception ex) { Services.AppLogger.Error($"Failed to load connection state {connectionId}", ex); }
+        return null;
+    }
+
+    public void SaveConnectionState(ConnectionTabState state)
+    {
+        try
+        {
+            Directory.CreateDirectory(ConnectionsDir);
+            var file = Path.Combine(ConnectionsDir, $"{state.ConnectionId}.json");
+            var json = JsonSerializer.Serialize(state, JsonOptions);
+            File.WriteAllText(file, json);
+        }
+        catch (Exception ex) { Services.AppLogger.Error($"Failed to save connection state {state.ConnectionId}", ex); }
+    }
+
+    public void DeleteConnectionState(string connectionId)
+    {
+        try
+        {
+            var file = Path.Combine(ConnectionsDir, $"{connectionId}.json");
+            if (File.Exists(file))
+                File.Delete(file);
+        }
+        catch (Exception ex) { Services.AppLogger.Error($"Failed to delete connection state {connectionId}", ex); }
     }
 
     private static void EncryptPasswords(AppState state)

@@ -7,10 +7,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Assets\sql.xshd"/>
+    <AvaloniaResource Include="Assets\app-icon.ico"/>
   </ItemGroup>
 
   <ItemGroup>

@@ -7,6 +7,7 @@ public class QueryHistoryEntry
     public string Query { get; set; } = "";
     public string Database { get; set; } = "";
     public string Connection { get; set; } = "";
+    public string ConnectionId { get; set; } = "";
     public DateTime ExecutedAt { get; set; }
 }
 
@@ -39,6 +40,15 @@ public class QueryHistoryService
             e.Query.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
             e.Database.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
             e.Connection.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToList();
+    }
+
+    public List<QueryHistoryEntry> LoadForConnection(string connectionId, string? filter = null)
+    {
+        var all = Load().Where(e => e.ConnectionId == connectionId).ToList();
+        if (string.IsNullOrWhiteSpace(filter)) return all;
+        return all.Where(e =>
+            e.Query.Contains(filter!, StringComparison.OrdinalIgnoreCase) ||
+            e.Database.Contains(filter!, StringComparison.OrdinalIgnoreCase)).ToList();
     }
 
     public void Add(QueryHistoryEntry entry)

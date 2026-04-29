@@ -16,6 +16,12 @@ public static class ResultsClipboard
         return [];
     }
 
+    // The first grid column is the row-number ("#") column; data columns start at grid index 1.
+    private static int DataIndex(DataGrid grid, DataGridColumn col) => grid.Columns.IndexOf(col) - 1;
+
+    private static IEnumerable<string> DataHeaders(DataGrid grid) =>
+        grid.Columns.Skip(1).Select(c => c.Header?.ToString() ?? "");
+
     public static async Task HandleKeyDown(DataGrid grid, KeyEventArgs e, IClipboard? clipboard)
     {
         if (e.Key != Key.C || clipboard == null) return;
@@ -32,10 +38,10 @@ public static class ResultsClipboard
             if (grid.SelectedItems.Count <= 1 && grid.CurrentColumn != null && grid.SelectedItem != null)
             {
                 var row = GetRowValues(grid.SelectedItem);
-                var colIndex = grid.Columns.IndexOf(grid.CurrentColumn);
-                if (colIndex >= 0 && colIndex < row.Length)
+                var dataIndex = DataIndex(grid, grid.CurrentColumn);
+                if (dataIndex >= 0 && dataIndex < row.Length)
                 {
-                    await clipboard.SetTextAsync(row[colIndex] ?? "");
+                    await clipboard.SetTextAsync(row[dataIndex] ?? "");
                     e.Handled = true;
                     return;
                 }
@@ -54,17 +60,16 @@ public static class ResultsClipboard
         if (grid.CurrentColumn == null || grid.SelectedItem == null) return;
 
         var row = GetRowValues(grid.SelectedItem);
-        var colIndex = grid.Columns.IndexOf(grid.CurrentColumn);
-        if (colIndex < 0 || colIndex >= row.Length) return;
+        var dataIndex = DataIndex(grid, grid.CurrentColumn);
+        if (dataIndex < 0 || dataIndex >= row.Length) return;
 
-        await clipboard.SetTextAsync(row[colIndex] ?? "");
+        await clipboard.SetTextAsync(row[dataIndex] ?? "");
     }
 
     public static async Task CopyWithHeaders(DataGrid grid, IClipboard clipboard)
     {
-        var headers = string.Join('\t', grid.Columns.Select(c => c.Header?.ToString() ?? ""));
         var sb = new StringBuilder();
-        sb.AppendLine(headers);
+        sb.AppendLine(string.Join('\t', DataHeaders(grid)));
 
         foreach (var item in grid.SelectedItems)
         {
@@ -79,9 +84,8 @@ public static class ResultsClipboard
     {
         if (grid.ItemsSource is not IList<ResultRow> rows || rows.Count == 0) return;
 
-        var headers = string.Join('\t', grid.Columns.Select(c => c.Header?.ToString() ?? ""));
         var sb = new StringBuilder();
-        sb.AppendLine(headers);
+        sb.AppendLine(string.Join('\t', DataHeaders(grid)));
 
         foreach (var row in rows)
             sb.AppendLine(string.Join('\t', Enumerable.Range(0, row.Length).Select(i => row[i] ?? "")));
@@ -104,7 +108,7 @@ public static class ResultsClipboard
         if (file == null) return;
 
         var sb = new StringBuilder();
-        sb.AppendLine(string.Join(',', grid.Columns.Select(c => CsvEscape(c.Header?.ToString()))));
+        sb.AppendLine(string.Join(',', DataHeaders(grid).Select(CsvEscape)));
 
         foreach (var row in rows)
             sb.AppendLine(string.Join(',', Enumerable.Range(0, row.Length).Select(i => CsvEscape(row[i]))));

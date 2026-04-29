@@ -2,124 +2,124 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ae="using:AvaloniaEdit"
         xmlns:converters="using:Avalonia.Controls.Converters"
-        x:Class="dbclient.Themes.DarkTheme">
+        x:Class="dbclient.Themes.LightTheme">
 
     <Styles.Resources>
         <!-- Title bar / Status bar -->
-        <SolidColorBrush x:Key="TitleBarBackground" Color="#1b1b1b"/>
-        <SolidColorBrush x:Key="TitleBarForeground" Color="#DBE6EC"/>
-        <SolidColorBrush x:Key="StatusBarText" Color="#888888"/>
-        <SolidColorBrush x:Key="StatusBarSeparator" Color="#4a4a4a"/>
-        <SolidColorBrush x:Key="WindowControlHover" Color="#3a3a3a"/>
+        <SolidColorBrush x:Key="TitleBarBackground" Color="#e8e8e8"/>
+        <SolidColorBrush x:Key="TitleBarForeground" Color="#1e1e1e"/>
+        <SolidColorBrush x:Key="StatusBarText" Color="#6b7280"/>
+        <SolidColorBrush x:Key="StatusBarSeparator" Color="#d1d5db"/>
+        <SolidColorBrush x:Key="WindowControlHover" Color="#d1d5db"/>
 
         <!-- Accent / UI -->
-        <SolidColorBrush x:Key="AccentColor" Color="#558cb1"/>
-        <SolidColorBrush x:Key="SecondaryText" Color="#888888"/>
-        <SolidColorBrush x:Key="WarningColor" Color="#D2BE3F"/>
+        <SolidColorBrush x:Key="AccentColor" Color="#2563eb"/>
+        <SolidColorBrush x:Key="SecondaryText" Color="#6b7280"/>
+        <SolidColorBrush x:Key="WarningColor" Color="#d97706"/>
 
         <!-- Tab strip -->
-        <SolidColorBrush x:Key="TabStripBackground" Color="#262626"/>
-        <SolidColorBrush x:Key="TabItemBackground" Color="#262626"/>
-        <SolidColorBrush x:Key="TabItemHover" Color="#3a3a3a"/>
-        <SolidColorBrush x:Key="TabItemSelected" Color="#1E1E1E"/>
-        <SolidColorBrush x:Key="TabItemSelectedText" Color="#DBE6EC"/>
-        <SolidColorBrush x:Key="TabItemText" Color="#888888"/>
+        <SolidColorBrush x:Key="TabStripBackground" Color="#e8e8e8"/>
+        <SolidColorBrush x:Key="TabItemBackground" Color="#e8e8e8"/>
+        <SolidColorBrush x:Key="TabItemHover" Color="#d1d5db"/>
+        <SolidColorBrush x:Key="TabItemSelected" Color="#ffffff"/>
+        <SolidColorBrush x:Key="TabItemSelectedText" Color="#111827"/>
+        <SolidColorBrush x:Key="TabItemText" Color="#6b7280"/>
 
         <!-- Panels -->
-        <SolidColorBrush x:Key="PanelBackground" Color="#262626"/>
-        <SolidColorBrush x:Key="PanelBorder" Color="#4a4a4a"/>
-        <SolidColorBrush x:Key="PanelHeaderBackground" Color="#1b1b1b"/>
-        <SolidColorBrush x:Key="PanelHeaderText" Color="#DBE6EC"/>
+        <SolidColorBrush x:Key="PanelBackground" Color="#f3f4f6"/>
+        <SolidColorBrush x:Key="PanelBorder" Color="#d1d5db"/>
+        <SolidColorBrush x:Key="PanelHeaderBackground" Color="#e8e8e8"/>
+        <SolidColorBrush x:Key="PanelHeaderText" Color="#111827"/>
 
         <!-- Icons -->
-        <SolidColorBrush x:Key="MenuIconColor" Color="#888888"/>
-        <SolidColorBrush x:Key="TabCloseIconColor" Color="#DBE6EC"/>
+        <SolidColorBrush x:Key="MenuIconColor" Color="#4b5563"/>
+        <SolidColorBrush x:Key="TabCloseIconColor" Color="#374151"/>
 
         <!-- Completion window -->
-        <SolidColorBrush x:Key="CompletionBackground" Color="#262626"/>
-        <SolidColorBrush x:Key="CompletionBorder" Color="#4a4a4a"/>
-        <SolidColorBrush x:Key="CompletionSelected" Color="#3a3a3a"/>
-        <SolidColorBrush x:Key="KeywordColor" Color="#558cb1"/>
-        <SolidColorBrush x:Key="TableColor" Color="#2B91AF"/>
-        <SolidColorBrush x:Key="ColumnColor" Color="#7aba7a"/>
-        <SolidColorBrush x:Key="AliasColor" Color="#D2BE3F"/>
+        <SolidColorBrush x:Key="CompletionBackground" Color="#ffffff"/>
+        <SolidColorBrush x:Key="CompletionBorder" Color="#d1d5db"/>
+        <SolidColorBrush x:Key="CompletionSelected" Color="#e0e7ff"/>
+        <SolidColorBrush x:Key="KeywordColor" Color="#7c3aed"/>
+        <SolidColorBrush x:Key="TableColor" Color="#0369a1"/>
+        <SolidColorBrush x:Key="ColumnColor" Color="#15803d"/>
+        <SolidColorBrush x:Key="AliasColor" Color="#b45309"/>
 
         <!-- Results grid -->
-        <SolidColorBrush x:Key="ResultsBackground" Color="#141414"/>
-        <SolidColorBrush x:Key="ResultsHeaderBackground" Color="#1E1E1E"/>
-        <SolidColorBrush x:Key="ResultsGridLine" Color="#3a3a3a"/>
+        <SolidColorBrush x:Key="ResultsBackground" Color="#ffffff"/>
+        <SolidColorBrush x:Key="ResultsHeaderBackground" Color="#f3f4f6"/>
+        <SolidColorBrush x:Key="ResultsGridLine" Color="#e5e7eb"/>
 
         <!-- Data type colors -->
-        <SolidColorBrush x:Key="DataTypeNumeric" Color="#e6b07a"/>
-        <SolidColorBrush x:Key="DataTypeDate" Color="#8be9fd"/>
-        <SolidColorBrush x:Key="DataTypeBoolean" Color="#bd93f9"/>
-        <SolidColorBrush x:Key="DataTypeBinary" Color="#9aa0a6"/>
-        <SolidColorBrush x:Key="DataTypeNull" Color="#666b7a"/>
+        <SolidColorBrush x:Key="DataTypeNumeric" Color="#a35f00"/>
+        <SolidColorBrush x:Key="DataTypeDate" Color="#0f6b8a"/>
+        <SolidColorBrush x:Key="DataTypeBoolean" Color="#6f42c1"/>
+        <SolidColorBrush x:Key="DataTypeBinary" Color="#6b7280"/>
+        <SolidColorBrush x:Key="DataTypeNull" Color="#9ca3af"/>
 
         <!-- Message colors -->
-        <SolidColorBrush x:Key="ErrorColor" Color="#ff5555"/>
-        <SolidColorBrush x:Key="SuccessColor" Color="#50fa7b"/>
-        <SolidColorBrush x:Key="InfoColor" Color="#6272a4"/>
-        <SolidColorBrush x:Key="NormalText" Color="#DBE6EC"/>
-        <SolidColorBrush x:Key="MutedText" Color="#888888"/>
-        <SolidColorBrush x:Key="CompletionText" Color="#DBE6EC"/>
-        <SolidColorBrush x:Key="CompletionDescText" Color="#888888"/>
+        <SolidColorBrush x:Key="ErrorColor" Color="#dc2626"/>
+        <SolidColorBrush x:Key="SuccessColor" Color="#16a34a"/>
+        <SolidColorBrush x:Key="InfoColor" Color="#6b7280"/>
+        <SolidColorBrush x:Key="NormalText" Color="#111827"/>
+        <SolidColorBrush x:Key="MutedText" Color="#9ca3af"/>
+        <SolidColorBrush x:Key="CompletionText" Color="#111827"/>
+        <SolidColorBrush x:Key="CompletionDescText" Color="#6b7280"/>
 
         <!-- Tree node colors: unified high-contrast normal text, db distinct -->
-        <SolidColorBrush x:Key="TreeNodeColor" Color="#DBE6EC"/>
-        <SolidColorBrush x:Key="DatabaseNodeColor" Color="#558cb1"/>
+        <SolidColorBrush x:Key="TreeNodeColor" Color="#111827"/>
+        <SolidColorBrush x:Key="DatabaseNodeColor" Color="#1d4ed8"/>
 
         <!-- Connection tree -->
-        <SolidColorBrush x:Key="TreeBackground" Color="#1a1a1a"/>
-        <SolidColorBrush x:Key="SearchBoxBackground" Color="#141414"/>
-        <SolidColorBrush x:Key="SearchBoxFocusBorder" Color="#3a3a3a"/>
+        <SolidColorBrush x:Key="TreeBackground" Color="#f3f4f6"/>
+        <SolidColorBrush x:Key="SearchBoxBackground" Color="#1f2937"/>
+        <SolidColorBrush x:Key="SearchBoxFocusBorder" Color="#4b5563"/>
 
         <!-- TreeView indent per nesting level (must redefine converter to pick up custom value) -->
         <x:Double x:Key="TreeViewItemIndent">2</x:Double>
         <converters:MarginMultiplierConverter Indent="{StaticResource TreeViewItemIndent}" Left="True" x:Key="TreeViewItemLeftMarginConverter"/>
 
         <!-- TreeView chevron arrow color: high-contrast accent, distinct from text -->
-        <SolidColorBrush x:Key="TreeViewItemForeground" Color="#558cb1"/>
-        <SolidColorBrush x:Key="TreeViewItemForegroundPointerOver" Color="#7fb3d8"/>
-        <SolidColorBrush x:Key="TreeViewItemForegroundPressed" Color="#7fb3d8"/>
-        <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="#7fb3d8"/>
-        <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPointerOver" Color="#7fb3d8"/>
-        <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPressed" Color="#7fb3d8"/>
+        <SolidColorBrush x:Key="TreeViewItemForeground" Color="#2563eb"/>
+        <SolidColorBrush x:Key="TreeViewItemForegroundPointerOver" Color="#1e40af"/>
+        <SolidColorBrush x:Key="TreeViewItemForegroundPressed" Color="#1e40af"/>
+        <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="#1e40af"/>
+        <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPointerOver" Color="#1e40af"/>
+        <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPressed" Color="#1e40af"/>
 
         <!-- Menu / ContextMenu (Fluent theme resources) -->
-        <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#1b1b1b"/>
-        <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#4a4a4a"/>
+        <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#ffffff"/>
+        <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#d1d5db"/>
         <SolidColorBrush x:Key="MenuFlyoutItemBackground" Color="Transparent"/>
-        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#3a3a3a"/>
-        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#4a4a4a"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#e5e7eb"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#d1d5db"/>
         <SolidColorBrush x:Key="MenuFlyoutItemBackgroundDisabled" Color="Transparent"/>
-        <SolidColorBrush x:Key="MenuFlyoutItemForeground" Color="#DBE6EC"/>
-        <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver" Color="#DBE6EC"/>
-        <SolidColorBrush x:Key="MenuFlyoutItemForegroundPressed" Color="#DBE6EC"/>
-        <SolidColorBrush x:Key="MenuFlyoutItemForegroundDisabled" Color="#595959"/>
-        <SolidColorBrush x:Key="MenuFlyoutSubItemChevron" Color="#888888"/>
-        <SolidColorBrush x:Key="MenuFlyoutSubItemChevronPointerOver" Color="#DBE6EC"/>
-        <SolidColorBrush x:Key="MenuFlyoutSubItemChevronSubMenuOpened" Color="#DBE6EC"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemForeground" Color="#111827"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver" Color="#111827"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemForegroundPressed" Color="#111827"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemForegroundDisabled" Color="#9ca3af"/>
+        <SolidColorBrush x:Key="MenuFlyoutSubItemChevron" Color="#6b7280"/>
+        <SolidColorBrush x:Key="MenuFlyoutSubItemChevronPointerOver" Color="#111827"/>
+        <SolidColorBrush x:Key="MenuFlyoutSubItemChevronSubMenuOpened" Color="#111827"/>
     </Styles.Resources>
 
     <Style Selector="Window">
-        <Setter Property="Background" Value="#2a2a2a"/>
-        <Setter Property="Foreground" Value="#DBE6EC"/>
+        <Setter Property="Background" Value="#f0f0f0"/>
+        <Setter Property="Foreground" Value="#111827"/>
     </Style>
 
     <Style Selector="ae|TextEditor">
-        <Setter Property="Background" Value="#141414"/>
-        <Setter Property="Foreground" Value="#DBE6EC"/>
-        <Setter Property="LineNumbersForeground" Value="#595959"/>
+        <Setter Property="Background" Value="#ffffff"/>
+        <Setter Property="Foreground" Value="#1e1e1e"/>
+        <Setter Property="LineNumbersForeground" Value="#9ca3af"/>
         <Setter Property="FontFamily" Value="Consolas"/>
         <Setter Property="ShowLineNumbers" Value="True"/>
         <Setter Property="Padding" Value="8,10,10,10"/>
-        <Setter Property="SearchResultsBrush" Value="#3A558cb1"/>
+        <Setter Property="SearchResultsBrush" Value="#40fbbf24"/>
     </Style>
 
     <Style Selector="Button">
-        <Setter Property="Background" Value="#3a3a3a"/>
-        <Setter Property="Foreground" Value="#DBE6EC"/>
+        <Setter Property="Background" Value="#e5e7eb"/>
+        <Setter Property="Foreground" Value="#111827"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="10,5"/>
         <Setter Property="CornerRadius" Value="3"/>
@@ -127,25 +127,25 @@
     </Style>
 
     <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="#3a3a3a"/>
+        <Setter Property="Background" Value="#e5e7eb"/>
     </Style>
 
     <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="#4a4a4a"/>
+        <Setter Property="Background" Value="#d1d5db"/>
     </Style>
 
     <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="Background" Value="#535353"/>
+        <Setter Property="Background" Value="#c0c4cb"/>
     </Style>
 
     <Style Selector="Menu">
-        <Setter Property="Background" Value="#1b1b1b"/>
-        <Setter Property="Foreground" Value="#DBE6EC"/>
+        <Setter Property="Background" Value="#e8e8e8"/>
+        <Setter Property="Foreground" Value="#111827"/>
     </Style>
 
     <Style Selector="MenuItem">
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Foreground" Value="#DBE6EC"/>
+        <Setter Property="Foreground" Value="#111827"/>
     </Style>
 
     <Style Selector="MenuItem /template/ Border#PART_LayoutRoot">
@@ -153,38 +153,38 @@
     </Style>
 
     <Style Selector="MenuItem:pointerover /template/ Border#PART_LayoutRoot">
-        <Setter Property="Background" Value="#3a3a3a"/>
+        <Setter Property="Background" Value="#d1d5db"/>
     </Style>
 
     <Style Selector="MenuItem:selected /template/ Border#PART_LayoutRoot">
-        <Setter Property="Background" Value="#3a3a3a"/>
+        <Setter Property="Background" Value="#d1d5db"/>
     </Style>
 
     <Style Selector="ContextMenu">
-        <Setter Property="Background" Value="#262626"/>
-        <Setter Property="BorderBrush" Value="#4a4a4a"/>
+        <Setter Property="Background" Value="#ffffff"/>
+        <Setter Property="BorderBrush" Value="#d1d5db"/>
     </Style>
 
     <!-- Menu dropdown popup background -->
     <Style Selector="MenuFlyoutPresenter">
-        <Setter Property="Background" Value="#1b1b1b"/>
-        <Setter Property="BorderBrush" Value="#4a4a4a"/>
+        <Setter Property="Background" Value="#ffffff"/>
+        <Setter Property="BorderBrush" Value="#d1d5db"/>
         <Setter Property="Padding" Value="0,4"/>
     </Style>
 
     <Style Selector="MenuFlyoutPresenter /template/ Border">
-        <Setter Property="Background" Value="#1b1b1b"/>
+        <Setter Property="Background" Value="#ffffff"/>
     </Style>
 
     <Style Selector="MenuItem /template/ Popup > Border">
-        <Setter Property="Background" Value="#1b1b1b"/>
-        <Setter Property="BorderBrush" Value="#4a4a4a"/>
+        <Setter Property="Background" Value="#ffffff"/>
+        <Setter Property="BorderBrush" Value="#d1d5db"/>
         <Setter Property="Padding" Value="0,4"/>
     </Style>
 
-    <!-- Scrollbar - override Fluent scale transforms so thumb is always full-width -->
+    <!-- Scrollbar -->
     <Style Selector="ScrollBar">
-        <Setter Property="Background" Value="#262626"/>
+        <Setter Property="Background" Value="#e5e7eb"/>
         <Setter Property="AllowAutoHide" Value="False"/>
         <Style.Resources>
             <TransformOperations x:Key="VerticalSmallScrollThumbScaleTransform">none</TransformOperations>
@@ -193,7 +193,7 @@
     </Style>
 
     <Style Selector="ScrollBar /template/ Thumb">
-        <Setter Property="Background" Value="#4a4a4a"/>
+        <Setter Property="Background" Value="#9ca3af"/>
         <Setter Property="MinWidth" Value="10"/>
         <Setter Property="MinHeight" Value="10"/>
         <Setter Property="RenderTransform" Value="none"/>
@@ -208,32 +208,32 @@
     </Style>
 
     <Style Selector="ScrollBar /template/ Thumb:pointerover">
-        <Setter Property="Background" Value="#6a6a6a"/>
+        <Setter Property="Background" Value="#6b7280"/>
     </Style>
 
     <Style Selector="TextBox">
-        <Setter Property="Background" Value="#1E1E1E"/>
-        <Setter Property="Foreground" Value="#DBE6EC"/>
-        <Setter Property="BorderBrush" Value="#4a4a4a"/>
-        <Setter Property="CaretBrush" Value="#DBE6EC"/>
-        <Setter Property="SelectionBrush" Value="#558cb1"/>
+        <Setter Property="Background" Value="#ffffff"/>
+        <Setter Property="Foreground" Value="#111827"/>
+        <Setter Property="BorderBrush" Value="#d1d5db"/>
+        <Setter Property="CaretBrush" Value="#111827"/>
+        <Setter Property="SelectionBrush" Value="#93c5fd"/>
     </Style>
 
     <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
-        <Setter Property="BorderBrush" Value="#558cb1"/>
+        <Setter Property="BorderBrush" Value="#2563eb"/>
     </Style>
 
     <Style Selector="TextBlock">
-        <Setter Property="Foreground" Value="#DBE6EC"/>
+        <Setter Property="Foreground" Value="#111827"/>
     </Style>
 
     <!-- TreeView -->
     <Style Selector="TreeView">
-        <Setter Property="Background" Value="#1a1a1a"/>
+        <Setter Property="Background" Value="#f3f4f6"/>
     </Style>
 
     <Style Selector="TreeViewItem">
-        <Setter Property="Foreground" Value="#DBE6EC"/>
+        <Setter Property="Foreground" Value="#111827"/>
         <Setter Property="MinHeight" Value="22"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Margin" Value="0"/>
@@ -246,15 +246,15 @@
     </Style>
 
     <Style Selector="TreeViewItem:selected /template/ Border#PART_LayoutRoot">
-        <Setter Property="Background" Value="#30558cb1"/>
+        <Setter Property="Background" Value="#302563eb"/>
     </Style>
 
     <Style Selector="TreeViewItem:pointerover /template/ Border#PART_LayoutRoot">
-        <Setter Property="Background" Value="#20DBE6EC"/>
+        <Setter Property="Background" Value="#15111827"/>
     </Style>
 
     <Style Selector="TreeViewItem:selected:pointerover /template/ Border#PART_LayoutRoot">
-        <Setter Property="Background" Value="#40558cb1"/>
+        <Setter Property="Background" Value="#402563eb"/>
     </Style>
 
     <Style Selector="TreeViewItem:selected /template/ ContentPresenter#PART_HeaderPresenter">
@@ -291,8 +291,8 @@
     </Style>
 
     <Style Selector="ListBox#ConnectionTabStrip ListBoxItem">
-        <Setter Property="Background" Value="#262626"/>
-        <Setter Property="Foreground" Value="#888888"/>
+        <Setter Property="Background" Value="#e8e8e8"/>
+        <Setter Property="Foreground" Value="#6b7280"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Margin" Value="0"/>
         <Setter Property="MinHeight" Value="28"/>
@@ -300,27 +300,27 @@
     </Style>
 
     <Style Selector="ListBox#ConnectionTabStrip ListBoxItem /template/ ContentPresenter">
-        <Setter Property="Background" Value="#262626"/>
+        <Setter Property="Background" Value="#e8e8e8"/>
     </Style>
 
     <Style Selector="ListBox#ConnectionTabStrip ListBoxItem:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="#3a3a3a"/>
+        <Setter Property="Background" Value="#d1d5db"/>
     </Style>
 
     <Style Selector="ListBox#ConnectionTabStrip ListBoxItem:selected /template/ ContentPresenter">
-        <Setter Property="Background" Value="#1E1E1E"/>
+        <Setter Property="Background" Value="#f3f4f6"/>
     </Style>
 
     <Style Selector="ListBox#ConnectionTabStrip ListBoxItem:selected TextBlock">
-        <Setter Property="Foreground" Value="#DBE6EC"/>
+        <Setter Property="Foreground" Value="#111827"/>
     </Style>
 
     <Style Selector="ListBox#ConnectionTabStrip ListBoxItem TextBlock">
-        <Setter Property="Foreground" Value="#888888"/>
+        <Setter Property="Foreground" Value="#6b7280"/>
     </Style>
 
     <Style Selector="ListBox#ConnectionTabStrip ListBoxItem:pointerover TextBlock">
-        <Setter Property="Foreground" Value="#DBE6EC"/>
+        <Setter Property="Foreground" Value="#111827"/>
     </Style>
 
     <!-- Query tab strip -->
@@ -381,31 +381,31 @@
 
     <!-- DataGrid -->
     <Style Selector="DataGrid">
-        <Setter Property="Background" Value="#141414"/>
-        <Setter Property="RowBackground" Value="#141414"/>
-        <Setter Property="BorderBrush" Value="#3a3a3a"/>
-        <Setter Property="HorizontalGridLinesBrush" Value="#333333"/>
-        <Setter Property="VerticalGridLinesBrush" Value="#333333"/>
+        <Setter Property="Background" Value="#ffffff"/>
+        <Setter Property="RowBackground" Value="#ffffff"/>
+        <Setter Property="BorderBrush" Value="#e5e7eb"/>
+        <Setter Property="HorizontalGridLinesBrush" Value="#f0f0f0"/>
+        <Setter Property="VerticalGridLinesBrush" Value="#f0f0f0"/>
         <Setter Property="RowHeight" Value="24"/>
     </Style>
     <Style Selector="DataGrid ScrollBar">
         <Setter Property="AllowAutoHide" Value="False"/>
     </Style>
     <Style Selector="DataGrid /template/ Rectangle#PART_BottomRightCorner">
-        <Setter Property="Fill" Value="#262626"/>
+        <Setter Property="Fill" Value="#e5e7eb"/>
     </Style>
     <Style Selector="DataGrid /template/ ScrollViewer /template/ Panel#PART_ScrollBarsSeparator">
-        <Setter Property="Background" Value="#262626"/>
+        <Setter Property="Background" Value="#e5e7eb"/>
         <Setter Property="Opacity" Value="1"/>
     </Style>
 
     <Style Selector="DataGridColumnHeader">
-        <Setter Property="Background" Value="#1E1E1E"/>
-        <Setter Property="Foreground" Value="#DBE6EC"/>
+        <Setter Property="Background" Value="#f3f4f6"/>
+        <Setter Property="Foreground" Value="#374151"/>
         <Setter Property="MinHeight" Value="26"/>
         <Setter Property="FontSize" Value="11"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="SeparatorBrush" Value="#4a4a4a"/>
+        <Setter Property="SeparatorBrush" Value="#d1d5db"/>
         <Setter Property="AreSeparatorsVisible" Value="False"/>
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         <Setter Property="Template">
@@ -423,7 +423,7 @@
                            Cursor="SizeWestEast"
                            Width="4"/>
                     <Border Grid.Column="0" Grid.ColumnSpan="2"
-                            BorderBrush="#3a3a3a"
+                            BorderBrush="#d1d5db"
                             BorderThickness="0,0,1,1"/>
                 </Grid>
             </ControlTemplate>
@@ -431,61 +431,61 @@
     </Style>
 
     <Style Selector="DataGridRow">
-        <Setter Property="Foreground" Value="#DBE6EC"/>
+        <Setter Property="Foreground" Value="#1e1e1e"/>
         <Setter Property="FontSize" Value="11"/>
         <Setter Property="MinHeight" Value="22"/>
     </Style>
 
     <Style Selector="DataGridCell">
-        <Setter Property="Foreground" Value="#DBE6EC"/>
+        <Setter Property="Foreground" Value="#1e1e1e"/>
         <Setter Property="Padding" Value="6,1"/>
         <Setter Property="FontSize" Value="11"/>
     </Style>
 
     <Style Selector="DataGridCell TextBlock">
-        <Setter Property="Foreground" Value="#DBE6EC"/>
+        <Setter Property="Foreground" Value="#1e1e1e"/>
         <Setter Property="FontSize" Value="11"/>
     </Style>
 
     <Style Selector="DataGridCell ContentPresenter">
-        <Setter Property="Foreground" Value="#DBE6EC"/>
+        <Setter Property="Foreground" Value="#1e1e1e"/>
     </Style>
 
     <!-- Current cell highlight -->
     <Style Selector="DataGridCell:current">
-        <Setter Property="Background" Value="#3a3a4a"/>
+        <Setter Property="Background" Value="#dde8ff"/>
     </Style>
 
     <!-- GridSplitter -->
     <Style Selector="GridSplitter">
-        <Setter Property="Background" Value="#3a3a3a"/>
+        <Setter Property="Background" Value="#d1d5db"/>
     </Style>
 
     <Style Selector="GridSplitter:pointerover">
-        <Setter Property="Background" Value="#4a4a4a"/>
+        <Setter Property="Background" Value="#9ca3af"/>
     </Style>
 
     <Style Selector="Separator">
-        <Setter Property="Background" Value="#3a3a3a"/>
+        <Setter Property="Background" Value="#e5e7eb"/>
         <Setter Property="Height" Value="1"/>
         <Setter Property="Margin" Value="0,4"/>
     </Style>
 
-    <!-- Menu separators: transparent background, thin line only -->
+    <!-- Menu separators -->
     <Style Selector="MenuItem > Separator">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="Transparent"/>
         <Setter Property="Height" Value="1"/>
         <Setter Property="Margin" Value="4,4"/>
         <Setter Property="Padding" Value="0"/>
-        <Setter Property="BorderBrush" Value="#4a4a4a"/>
+        <Setter Property="BorderBrush" Value="#d1d5db"/>
         <Setter Property="BorderThickness" Value="0,1,0,0"/>
     </Style>
 
     <Style Selector="MenuItem > Separator /template/ Border">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Height" Value="1"/>
-        <Setter Property="BorderBrush" Value="#4a4a4a"/>
+        <Setter Property="BorderBrush" Value="#d1d5db"/>
         <Setter Property="BorderThickness" Value="0,1,0,0"/>
     </Style>
 
@@ -494,14 +494,14 @@
         <Setter Property="Height" Value="1"/>
         <Setter Property="Margin" Value="4,4"/>
         <Setter Property="Padding" Value="0"/>
-        <Setter Property="BorderBrush" Value="#4a4a4a"/>
+        <Setter Property="BorderBrush" Value="#d1d5db"/>
         <Setter Property="BorderThickness" Value="0,1,0,0"/>
     </Style>
 
     <Style Selector="ContextMenu Separator /template/ Border">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Height" Value="1"/>
-        <Setter Property="BorderBrush" Value="#4a4a4a"/>
+        <Setter Property="BorderBrush" Value="#d1d5db"/>
         <Setter Property="BorderThickness" Value="0,1,0,0"/>
     </Style>
 </Styles>

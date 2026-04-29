@@ -36,9 +36,9 @@ dbclient/
 ├── src/dbclient/              # Avalonia UI application
 │   ├── Views/                 # AXAML views + code-behind
 │   ├── ViewModels/            # MVVM view models (INotifyPropertyChanged)
-│   ├── Services/              # SchemaService, MockSchemaProvider
-│   ├── Models/                # AppState, ConnectionConfig
-│   ├── Themes/                # Dark.axaml (default), Dracula.axaml (alternate)
+│   ├── Services/              # SchemaService, ThemeColors, ResultsClipboard, etc.
+│   ├── Models/                # AppState, ConnectionConfig, QueryHistory
+│   ├── Themes/                # Dark.axaml (default), Dracula.axaml, Light.axaml
 │   └── Assets/                # sql.xshd (syntax highlighting, embedded resource)
 ├── lib/dbclient.IntelliSense/ # SQL IntelliSense engine (zero dependencies)
 │   ├── Parsing/SqlParser.cs   # Regex tokenizer, context detection, alias tracking
@@ -74,18 +74,33 @@ dbclient/
 - **MainWindow.axaml** — Custom title bar (36x28 window buttons), connection tab strip, query tab strip, connection panel (left), editor+results split (center), status bar
 - **EditorView.axaml.cs** — AvaloniaEdit + CompletionWindow. Reads `IntelliSenseProvider` live from ViewModel on each completion trigger (not cached). Dot typing closes existing completion window and opens fresh column completions. SQL highlighting loaded from embedded `sql.xshd` resource.
 - **ResultsPanel.axaml.cs** — Converts DataTable to `List<string?[]>` with manual `DataGridTextColumn` using integer indexer bindings. Subscribes to `ResultData` property changes.
-- **ConnectionPanel.axaml** — Schema tree (databases as top-level nodes, active one expanded) + connections overlay. Tree binding managed in code-behind (`tree.ItemsSource = connTab.ConnectionTree`) to avoid compiled binding chain issues. Double-click table inserts `SELECT * FROM` with dialect-appropriate quoting. Ctrl+C copies selected node name.
+- **ConnectionPanel.axaml** — Schema tree (databases as top-level nodes, active one expanded) + connections overlay. Tree binding managed in code-behind (`tree.ItemsSource = connTab.ConnectionTree`) to avoid compiled binding chain issues. Double-click table inserts `SELECT * FROM` with dialect-appropriate quoting. Ctrl+C copies selected node name. Always-visible search bar above the tree filters tables/columns; Ctrl+F focuses it. Connection failure shows an error overlay with a Retry button (toggled via `HasConnectionError`).
+- **HistoryPanel.axaml** — Per-connection query history list. Subscribes to `ThemeColors.ThemeChanged` to refresh dynamically-built rows.
 - **ConnectionDialog.axaml** — Modal for new/edit connection
 - **SqlCompletionData.cs** — Bridges CompletionItem to ICompletionData with colored type indicators
 
+#### Schema Tree Filter
+- **Always-visible search bar** at the top of `ConnectionPanel`, with a flyout (funnel icon) to scope between `Tables` and `Columns`. Each `ConnectionTabViewModel` has its own `TreeFilter`, `FilterTables`, `FilterColumns`.
+- **Search syntax**: spaces between tokens = AND within an alternative; `|` separates alternatives = OR. Example: `customer order|client name` → `(customer AND order) OR (client AND name)`.
+- **Debounce**: 250ms `DispatcherTimer` in `ConnectionPanel.axaml.cs` resets on every TextChanged before pushing the filter into the VM.
+- **Filtered tree**: `ConnectionTabViewModel` keeps two collections — `_unfilteredTree` (unbound source) and `ConnectionTree` (bound to TreeView). `ApplyTreeFilter()` rebuilds `ConnectionTree` from `_unfilteredTree` via `FilterNode` recursion. Containers (Database/Folder/Schema) always expand; tables/views expand only when a child column matched (i.e., column scope is on).
+- **Esc** in the filter box clears the filter and returns focus to the tree.
+
 #### ViewModels
 - **MainWindowViewModel** — Holds `ConnectionTabs` collection, `SavedConnections`, state persistence. Auto-selects first query tab when switching connection tabs.
-- **ConnectionTabViewModel** — Per-connection: IDbConnectionProvider, IntelliSenseProvider, QueryTabs, schema tree, database list, color. `ConnectAsync` uses `force: true` on `SwitchDatabaseAsync` to ensure schema loads even when ActiveDatabase matches saved state.
+- **ConnectionTabViewModel** — Per-connection: IDbConnectionProvider, IntelliSenseProvider, QueryTabs, schema tree, database list, color. `ConnectAsync` uses `force: true` on `SwitchDatabaseAsync` to ensure schema loads even when ActiveDatabase matches saved state. Sets `HasConnectionError` + `ConnectionError` in the catch block; the panel watches these to show the retry overlay. Holds `_unfilteredTree` plus `TreeFilter` / `FilterTables` / `FilterColumns` for the tree filter.
 - **SessionTabViewModel** — Per-query-tab: QueryText, ResultData, cursor. `SetQueryText()` fires `QueryTextSet` event so EditorView syncs the AvaloniaEdit control.
 
 #### State & Services
 - **AppState.cs** — JSON to `~/.dbclient/state.json`. Nested: `AppState → ConnectionTabState[] → TabState[]`. Auto-saves on query execute (in `finally` block) and app shutdown.
 - **SchemaService.cs** — Bridges Data→IntelliSense models. Returns **dialect-specific keywords**: SQL Server (`GETDATE()`, `ISNULL`, `TOP`, `@@ROWCOUNT`), MySQL (`NOW()`, `IFNULL`, `GROUP_CONCAT`, `JSON_EXTRACT`), SQLite (`datetime('now')`, `strftime`, `PRAGMA`).
+- **ThemeColors.cs** — Resource-lookup helpers (`Get(key, fallback)` returns a brush; `GetColor` returns the hex string). Exposes a static `ThemeChanged` event that `App.SetTheme` fires after swapping styles. Panels that build content programmatically (`ConnectionPanel`, `HistoryPanel`, `ResultsPanel`) subscribe and refresh their dynamic UI on theme swap.
+
+#### Theme Swap
+- `App.SetTheme(name)` removes the previous `Styles` entry and adds a new one (`DarkTheme` / `LightTheme` / `DraculaTheme`), then calls `ThemeColors.NotifyThemeChanged()`.
+- Anything bound via `{DynamicResource ...}` updates automatically.
+- Anything resolved imperatively via `ThemeColors.Get(...)` does **not** auto-refresh — its consumer must subscribe to `ThemeColors.ThemeChanged`. `ConnectionTreeNode.NameBrush` is one such case: the panel walks every connection tab's tree and calls `node.RefreshThemeBrushes()` on theme change so each `Foreground="{Binding NameBrush}"` re-evaluates.
+- Tree node colors are intentionally unified per theme: a single `TreeNodeColor` brush for tables/views/columns/schemas/folders/procs (high-contrast normal text), with `DatabaseNodeColor` reserved for distinct accent on database nodes.
 
 ### Technology Stack
 - **.NET 10.0** cross-platform
@@ -96,6 +111,16 @@ dbclient/
 - **Microsoft.Data.SqlClient, MySql.Data, System.Data.SQLite.Core** — DB drivers
 - **SSH.NET** — SSH tunnel support
 - **System.Text.Json** — State serialization
+
+### Icons — Lucide
+- All UI icons (except the app icon) use **Lucide** SVG paths from https://github.com/lucide-icons/lucide/tree/main/icons
+- Icons are **stroke-based**: use `Stroke`, `StrokeThickness="1.5"`, `StrokeLineCap="Round"`, `StrokeJoin="Round"` — never `Fill` for icons. (Avalonia uses `StrokeJoin`, not `StrokeLineJoin`.)
+- Lucide SVGs use a 24×24 viewBox. Multi-element SVGs (multiple `<path>`, `<circle>`, `<rect>`, `<ellipse>`) must be combined into a single `Data` string:
+  - Concatenate multiple `<path d="..."/>` with spaces: `"M3 12h18 M12 3v18"`
+  - Convert `<circle cx="12" cy="12" r="10"/>` → `M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0`
+  - Convert `<ellipse cx="12" cy="5" rx="9" ry="3"/>` → `M3 5a9 3 0 1 0 18 0a9 3 0 1 0-18 0`
+  - Convert `<rect x="3" y="3" width="18" height="18" rx="2"/>` → `M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z`
+- When adding new icons, find the matching Lucide icon at the URL above, fetch its SVG, and convert using the rules above.
 
 ### Avalonia-Specific Gotchas
 
@@ -112,6 +137,8 @@ dbclient/
 #### Themes / Styling
 - Menu separators in Fluent theme have their own background. Fix: set `MenuItem` and `MenuItem /template/ Border#PART_LayoutRoot` to `Transparent` so they inherit from the popup container. Style `MenuFlyoutPresenter` and `MenuItem /template/ Popup > Border` for popup background.
 - TreeView chevron gap: override `ToggleButton#PART_ExpandCollapseChevron` width/padding in theme. Content margin can use negative values to pull text closer.
+- TreeView chevron color: the Fluent theme binds the chevron `Path.Fill` to `DynamicResource TreeViewItemForeground` — styling the Path element directly has no effect. Override `TreeViewItemForeground`, `TreeViewItemForegroundPointerOver`, `TreeViewItemForegroundSelected`, etc. in `<Styles.Resources>` instead.
+- Menu/ContextMenu colors: the Fluent theme uses `MenuFlyoutPresenterBackground`, `MenuFlyoutPresenterBorderBrush`, `MenuFlyoutItemBackground`, `MenuFlyoutItemBackgroundPointerOver`, `MenuFlyoutItemForeground`, `MenuFlyoutSubItemChevron`, etc. Override these in `<Styles.Resources>` — direct style selectors on `MenuItem` or `ContextMenu` may not take effect.
 - TreeView selection: style `Border#PART_LayoutRoot` for selection highlight, set `ContentPresenter#PART_HeaderPresenter` to Transparent to remove default gray box.
 - ScrollBar auto-hide: set `AllowAutoHide="False"` both globally and inside DataGrid's own `<DataGrid.Styles>`.
 - `AvaloniaResource` in csproj: don't add explicit `<AvaloniaResource Include="Assets\**"/>` — it overrides the SDK default that auto-includes `*.axaml` files, causing "No precompiled XAML found" errors.
@@ -119,6 +146,31 @@ dbclient/
 #### sql.xshd Syntax Highlighting
 - Must be an `<EmbeddedResource>` in csproj, NOT an AvaloniaResource.
 - Loaded via `Assembly.GetManifestResourceStream("dbclient.Assets.sql.xshd")`.
+
+#### TreeView IsExpanded
+- `TreeViewItem.IsExpanded` is **not** auto-bound to a same-named property on the data context. To drive expansion from the model (e.g., `ConnectionTreeNode.IsExpanded`), declare an in-tree `Style` inside the `TreeView`:
+  ```xml
+  <TreeView.Styles>
+      <Style Selector="TreeViewItem" x:DataType="vm:ConnectionTreeNode">
+          <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+      </Style>
+  </TreeView.Styles>
+  ```
+
+#### Flattening TextBox focus visuals
+- Setting `BorderThickness="0"` on a `TextBox` is not enough — the Fluent theme's template still draws focus/hover state on the inner `Border#PART_BorderElement`. To make a chrome-less search-style box, add a class (e.g., `Classes="searchbox"`) and override the template parts:
+  ```xml
+  <Style Selector="TextBox.searchbox /template/ Border#PART_BorderElement">
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+  </Style>
+  <Style Selector="TextBox.searchbox:focus /template/ Border#PART_BorderElement">
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+  </Style>
+  ```
+  Repeat for `:pointerover` / `:focus-within`. Done this way for the schema-tree search box so the focus highlight lives on the outer wrapper Border instead.
 
 ### Known Issues
 - WSL builds on /mnt/f may get MSB3021 file lock errors if the app is running. Build from Windows terminal or close the app first.

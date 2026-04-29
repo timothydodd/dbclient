@@ -16,11 +16,123 @@ public partial class ConnectionPanel : UserControl
     private MainWindowViewModel? _vm;
     private System.ComponentModel.PropertyChangedEventHandler? _vmPropertyChangedHandler;
     private System.Collections.Specialized.NotifyCollectionChangedEventHandler? _savedConnectionsHandler;
+    private ConnectionTabViewModel? _errorBoundTab;
+    private System.ComponentModel.PropertyChangedEventHandler? _errorTabHandler;
 
     public ConnectionPanel()
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        Services.ThemeColors.ThemeChanged += OnThemeChanged;
+        DetachedFromVisualTree += (_, _) => Services.ThemeColors.ThemeChanged -= OnThemeChanged;
+
+        AddHandler(KeyDownEvent, OnPanelKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+
+        _filterDebounce = new Avalonia.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(250)
+        };
+        _filterDebounce.Tick += (_, _) =>
+        {
+            _filterDebounce.Stop();
+            var box = this.FindControl<TextBox>("FilterBox");
+            ApplyFilterFromBox(box?.Text);
+        };
+
+        var filterBox = this.FindControl<TextBox>("FilterBox");
+        if (filterBox != null)
+        {
+            filterBox.TextChanged += (_, _) =>
+            {
+                _filterDebounce.Stop();
+                _filterDebounce.Start();
+            };
+            filterBox.GotFocus += (_, _) => UpdateFilterBarBorder(true);
+            filterBox.LostFocus += (_, _) => UpdateFilterBarBorder(false);
+        }
+    }
+
+    private void UpdateFilterBarBorder(bool focused)
+    {
+        var bar = this.FindControl<Border>("FilterBar");
+        if (bar == null) return;
+        bar.BorderBrush = focused
+            ? Services.ThemeColors.Get("SearchBoxFocusBorder", "#3a3a3a")
+            : Avalonia.Media.Brushes.Transparent;
+    }
+
+    private readonly Avalonia.Threading.DispatcherTimer _filterDebounce;
+
+    private void OnPanelKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key == Avalonia.Input.Key.F && e.KeyModifiers == Avalonia.Input.KeyModifiers.Control)
+        {
+            var box = this.FindControl<TextBox>("FilterBox");
+            box?.Focus();
+            box?.SelectAll();
+            e.Handled = true;
+        }
+    }
+
+    private void ApplyFilterFromBox(string? text)
+    {
+        if (_vm?.SelectedConnectionTab != null)
+            _vm.SelectedConnectionTab.TreeFilter = text ?? "";
+    }
+
+    private bool _syncingScope;
+
+    private void SyncFilterScopeUi()
+    {
+        var tables = this.FindControl<CheckBox>("ScopeTablesCheckBox");
+        var columns = this.FindControl<CheckBox>("ScopeColumnsCheckBox");
+        var tab = _vm?.SelectedConnectionTab;
+        _syncingScope = true;
+        if (tables != null) tables.IsChecked = tab?.FilterTables ?? true;
+        if (columns != null) columns.IsChecked = tab?.FilterColumns ?? false;
+        _syncingScope = false;
+    }
+
+    private void FilterScope_Changed(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_syncingScope) return;
+        var tab = _vm?.SelectedConnectionTab;
+        if (tab == null) return;
+
+        var tables = this.FindControl<CheckBox>("ScopeTablesCheckBox");
+        var columns = this.FindControl<CheckBox>("ScopeColumnsCheckBox");
+        tab.FilterTables = tables?.IsChecked == true;
+        tab.FilterColumns = columns?.IsChecked == true;
+    }
+
+    private void FilterBox_KeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key == Avalonia.Input.Key.Escape)
+        {
+            var box = this.FindControl<TextBox>("FilterBox");
+            if (box != null) box.Text = "";
+            ApplyFilterFromBox(null);
+            this.FindControl<TreeView>("SchemaTree")?.Focus();
+            e.Handled = true;
+        }
+    }
+
+    private void ClearFilter_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var box = this.FindControl<TextBox>("FilterBox");
+        if (box != null) box.Text = "";
+        ApplyFilterFromBox(null);
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        if (_vm != null)
+        {
+            foreach (var connTab in _vm.ConnectionTabs)
+                foreach (var node in connTab.ConnectionTree)
+                    node.RefreshThemeBrushes();
+        }
+        BuildSavedConnectionsList();
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -72,6 +184,46 @@ public partial class ConnectionPanel : UserControl
         // Subscribe so we can force refresh if needed
         if (connTab != null)
             connTab.ConnectionTree.CollectionChanged += OnTreeCollectionChanged;
+
+        BindErrorOverlay(connTab);
+        SyncFilterScopeUi();
+    }
+
+    private void BindErrorOverlay(ConnectionTabViewModel? connTab)
+    {
+        if (_errorBoundTab != null && _errorTabHandler != null)
+            _errorBoundTab.PropertyChanged -= _errorTabHandler;
+
+        _errorBoundTab = connTab;
+        _errorTabHandler = (_, args) =>
+        {
+            if (args.PropertyName is nameof(ConnectionTabViewModel.HasConnectionError)
+                or nameof(ConnectionTabViewModel.ConnectionError))
+                UpdateErrorOverlay();
+        };
+        if (connTab != null)
+            connTab.PropertyChanged += _errorTabHandler;
+
+        UpdateErrorOverlay();
+    }
+
+    private void UpdateErrorOverlay()
+    {
+        var panel = this.FindControl<Border>("ConnectionErrorPanel");
+        var text = this.FindControl<TextBlock>("ConnectionErrorText");
+        var tree = this.FindControl<TreeView>("SchemaTree");
+        if (panel == null) return;
+
+        var hasError = _errorBoundTab?.HasConnectionError == true;
+        panel.IsVisible = hasError;
+        if (tree != null) tree.IsVisible = !hasError;
+        if (text != null) text.Text = _errorBoundTab?.ConnectionError ?? "";
+    }
+
+    private async void RetryConnection_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_errorBoundTab != null)
+            await _errorBoundTab.ConnectAsync();
     }
 
     private void OnTreeCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
@@ -103,8 +255,11 @@ public partial class ConnectionPanel : UserControl
             var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             content.Children.Add(new Avalonia.Controls.Shapes.Path
             {
-                Data = Avalonia.Media.Geometry.Parse("M12 2C6.48 2 2 4.02 2 6.5v11C2 19.98 6.48 22 12 22s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2z"),
-                Fill = Services.ThemeColors.Get("AccentColor", "#bd93f9"),
+                Data = Avalonia.Media.Geometry.Parse("M3 5a9 3 0 1 0 18 0a9 3 0 1 0-18 0 M3 5V19A9 3 0 0 0 21 19V5 M3 12A9 3 0 0 0 21 12"),
+                Stroke = Services.ThemeColors.Get("AccentColor", "#bd93f9"),
+                StrokeThickness = 1.5,
+                StrokeLineCap = PenLineCap.Round,
+                StrokeJoin = PenLineJoin.Round,
                 Stretch = Stretch.Uniform,
                 Width = 14, Height = 14,
                 VerticalAlignment = VerticalAlignment.Center
@@ -134,6 +289,16 @@ public partial class ConnectionPanel : UserControl
         }
 
         scrollViewer.Content = stack;
+    }
+
+    private void CloseConnectionTab_Click(object? sender, RoutedEventArgs e)
+    {
+        ConnectionTabViewModel? tab = null;
+        if (sender is MenuItem mi && mi.Tag is ConnectionTabViewModel mt) tab = mt;
+        else if (sender is Button btn && btn.Tag is ConnectionTabViewModel bt) tab = bt;
+
+        if (tab != null && _vm != null)
+            _vm.CloseConnectionTab(tab);
     }
 
     private async void RefreshSchema_Click(object? sender, RoutedEventArgs e)
@@ -199,6 +364,13 @@ public partial class ConnectionPanel : UserControl
             _ => $"[{name}]"
         };
 
+        string QualifiedName(ConnectionTreeNode n)
+        {
+            if (!string.IsNullOrEmpty(n.SchemaName))
+                return $"{QuoteName(n.SchemaName)}.{QuoteName(n.Name)}";
+            return QuoteName(n.Name);
+        }
+
         void AddMenuItem(string header, Action action)
         {
             var item = new MenuItem { Header = header };
@@ -230,7 +402,7 @@ public partial class ConnectionPanel : UserControl
                 break;
 
             case ConnectionTreeNodeType.Table:
-                var qt = QuoteName(node.Name);
+                var qt = QualifiedName(node);
                 AddMenuItem("SELECT * FROM", () => InsertQuery($"SELECT * FROM {qt}"));
                 AddMenuItem("SELECT TOP 100", () => InsertQuery(
                     connTab.Config.Type == ConnectionType.MySql
@@ -251,7 +423,7 @@ public partial class ConnectionPanel : UserControl
                 break;
 
             case ConnectionTreeNodeType.View:
-                var qv = QuoteName(node.Name);
+                var qv = QualifiedName(node);
                 AddMenuItem("SELECT * FROM", () => InsertQuery($"SELECT * FROM {qv}"));
                 AddMenuItem("SELECT TOP 100", () => InsertQuery(
                     connTab.Config.Type == ConnectionType.MySql
@@ -266,10 +438,11 @@ public partial class ConnectionPanel : UserControl
                 break;
 
             case ConnectionTreeNodeType.StoredProcedure:
+                var qp = QualifiedName(node);
                 AddMenuItem("EXEC", () => InsertQuery(
                     connTab.Config.Type == ConnectionType.MySql
-                        ? $"CALL {node.Name}()"
-                        : $"EXEC {node.Name}"));
+                        ? $"CALL {qp}()"
+                        : $"EXEC {qp}"));
                 menu.Items.Add(new Separator());
                 AddMenuItem("Copy Name", () => CopyToClipboard(node.Name));
                 break;
@@ -299,12 +472,15 @@ public partial class ConnectionPanel : UserControl
         if (node.NodeType is not (ConnectionTreeNodeType.Table or ConnectionTreeNodeType.View)) return;
 
         var connTab = _vm.SelectedConnectionTab;
-        var quoted = connTab.Config.Type switch
+        string QuoteName(string name) => connTab.Config.Type switch
         {
-            ConnectionType.MySql => $"`{node.Name}`",
-            ConnectionType.Sqlite => $"\"{node.Name}\"",
-            _ => $"[{node.Name}]"  // SQL Server
+            ConnectionType.MySql => $"`{name}`",
+            ConnectionType.Sqlite => $"\"{name}\"",
+            _ => $"[{name}]"
         };
+        var quoted = !string.IsNullOrEmpty(node.SchemaName)
+            ? $"{QuoteName(node.SchemaName)}.{QuoteName(node.Name)}"
+            : QuoteName(node.Name);
         var query = $"SELECT * FROM {quoted}";
 
         if (connTab.QueryTabs.Count == 0)
@@ -327,7 +503,10 @@ public partial class ConnectionPanel : UserControl
         };
 
         var sb = new StringBuilder();
-        sb.AppendLine($"CREATE TABLE {QuoteName(tableNode.Name)} (");
+        var tableName = !string.IsNullOrEmpty(tableNode.SchemaName)
+            ? $"{QuoteName(tableNode.SchemaName)}.{QuoteName(tableNode.Name)}"
+            : QuoteName(tableNode.Name);
+        sb.AppendLine($"CREATE TABLE {tableName} (");
 
         var columns = tableNode.Children.ToList();
         var pkColumns = new List<string>();
@@ -403,9 +582,6 @@ public partial class ConnectionPanel : UserControl
     {
         var config = (sender as MenuItem)?.Tag as ConnectionConfig;
         if (config != null && _vm != null)
-        {
-            _vm.SavedConnections.Remove(config);
-            _vm.SaveState();
-        }
+            _vm.DeleteSavedConnection(config);
     }
 }

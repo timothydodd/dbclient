@@ -6,6 +6,9 @@ namespace dbclient.Services;
 
 public static class ThemeColors
 {
+    public static event EventHandler? ThemeChanged;
+    public static void NotifyThemeChanged() => ThemeChanged?.Invoke(null, EventArgs.Empty);
+
     public static IBrush Get(string key, string fallback = "#ffffff")
     {
         if (Application.Current?.TryFindResource(key, out var resource) == true

@@ -93,6 +93,9 @@ public partial class ConnectionDialog : Window
                 return new SqlServerConnection
                 {
                     Address = config.Address,
+                    AuthMode = config.AuthMode == SqlAuthMode.AzureDefault
+                        ? SqlServerAuthMode.AzureDefault
+                        : SqlServerAuthMode.SqlLogin,
                     User = config.User,
                     Password = config.Password,
                     Port = config.Port,

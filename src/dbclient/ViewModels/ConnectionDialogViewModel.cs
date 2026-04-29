@@ -5,6 +5,7 @@ namespace dbclient.ViewModels;
 public class ConnectionDialogViewModel : ViewModelBase
 {
     private ConnectionType _connectionType = ConnectionType.SqlServer;
+    private SqlAuthMode _authMode = SqlAuthMode.SqlLogin;
     private string _address = "";
     private string _user = "";
     private string _password = "";
@@ -32,12 +33,26 @@ public class ConnectionDialogViewModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(IsServerConnection));
                 OnPropertyChanged(nameof(IsSqlite));
+                OnPropertyChanged(nameof(IsSqlServer));
+                OnPropertyChanged(nameof(ShowSqlLoginFields));
             }
+        }
+    }
+
+    public SqlAuthMode AuthMode
+    {
+        get => _authMode;
+        set
+        {
+            if (SetField(ref _authMode, value))
+                OnPropertyChanged(nameof(ShowSqlLoginFields));
         }
     }
 
     public bool IsServerConnection => ConnectionType != ConnectionType.Sqlite;
     public bool IsSqlite => ConnectionType == ConnectionType.Sqlite;
+    public bool IsSqlServer => ConnectionType == ConnectionType.SqlServer;
+    public bool ShowSqlLoginFields => IsServerConnection && AuthMode == SqlAuthMode.SqlLogin;
 
     public string Address { get => _address; set => SetField(ref _address, value); }
     public string User { get => _user; set => SetField(ref _user, value); }
@@ -61,6 +76,7 @@ public class ConnectionDialogViewModel : ViewModelBase
     {
         DisplayName = DisplayName,
         Type = ConnectionType,
+        AuthMode = AuthMode,
         Address = Address,
         User = User,
         Password = Password,
@@ -81,6 +97,7 @@ public class ConnectionDialogViewModel : ViewModelBase
     {
         DisplayName = config.DisplayName;
         ConnectionType = config.Type;
+        AuthMode = config.AuthMode;
         Address = config.Address;
         User = config.User;
         Password = config.Password;

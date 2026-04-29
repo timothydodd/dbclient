@@ -86,7 +86,16 @@
                         <TextBox Text="{Binding Address}" Watermark="localhost"/>
                     </StackPanel>
 
-                    <Grid ColumnDefinitions="*,Auto,100">
+                    <StackPanel Spacing="4" IsVisible="{Binding IsSqlServer}">
+                        <TextBlock Text="Authentication" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                        <ComboBox SelectedIndex="{Binding AuthMode}"
+                                  HorizontalAlignment="Stretch">
+                            <ComboBoxItem Content="SQL Login"/>
+                            <ComboBoxItem Content="Azure (use az login)"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <Grid ColumnDefinitions="*,Auto,100" IsVisible="{Binding ShowSqlLoginFields}">
                         <StackPanel Spacing="4">
                             <TextBlock Text="Username" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
                             <TextBox Text="{Binding User}" Watermark="sa"/>
@@ -97,7 +106,7 @@
                         </StackPanel>
                     </Grid>
 
-                    <StackPanel Spacing="4">
+                    <StackPanel Spacing="4" IsVisible="{Binding ShowSqlLoginFields}">
                         <TextBlock Text="Password" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
                         <TextBox Text="{Binding Password}" PasswordChar="*"/>
                     </StackPanel>

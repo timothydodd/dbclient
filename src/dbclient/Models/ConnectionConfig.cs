@@ -11,6 +11,9 @@ public class ConnectionConfig
     public string Port { get; set; } = "";
     public string Database { get; set; } = "";
 
+    // SQL Server auth: SqlLogin (default) or AzureDefault (uses az login / DefaultAzureCredential chain)
+    public SqlAuthMode AuthMode { get; set; } = SqlAuthMode.SqlLogin;
+
     // SQLite
     public string FileName { get; set; } = "";
 
@@ -37,4 +40,10 @@ public enum ConnectionType
     SqlServer,
     MySql,
     Sqlite
+}
+
+public enum SqlAuthMode
+{
+    SqlLogin,
+    AzureDefault
 }

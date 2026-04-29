@@ -19,6 +19,7 @@ public class ResultRow
 {
     private readonly string?[] _values;
     public ResultRow(string?[] values) => _values = values;
+    public int RowNumber { get; set; }
     public string? this[int i]
     {
         get => _values[i];
@@ -64,6 +65,14 @@ public partial class ResultsPanel : UserControl
                 e.Handled = true;
             }
         };
+
+        ThemeColors.ThemeChanged += OnThemeChanged;
+        DetachedFromVisualTree += (_, _) => ThemeColors.ThemeChanged -= OnThemeChanged;
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        if (_currentVm != null) UpdateResultSets(_currentVm.ResultData);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -190,16 +199,41 @@ public partial class ResultsPanel : UserControl
         grid.Columns.Clear();
 
         _columnNames = data.ColumnNames;
+
+        // Row number column (frozen, read-only, muted)
+        grid.Columns.Add(new DataGridTemplateColumn
+        {
+            Header = "#",
+            IsReadOnly = true,
+            Width = DataGridLength.Auto,
+            CellTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<ResultRow>((_, _) =>
+            {
+                var tb = new TextBlock();
+                tb.Bind(TextBlock.TextProperty, new Avalonia.Data.Binding("RowNumber"));
+                tb.Foreground = ThemeColors.MutedText;
+                tb.Opacity = 0.6;
+                tb.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
+                return tb;
+            })
+        });
+        grid.FrozenColumnCount = 1;
+
         for (int i = 0; i < _columnNames.Length; i++)
         {
-            grid.Columns.Add(new DataGridTextColumn
+            var col = new DataGridTextColumn
             {
                 Header = _columnNames[i],
                 Binding = new Avalonia.Data.Binding($"[{i}]")
-            });
+            };
+
+            var typeBrush = ResolveTypeBrush(data.ColumnTypes.ElementAtOrDefault(i));
+            if (typeBrush != null)
+                col.Foreground = typeBrush;
+
+            grid.Columns.Add(col);
         }
 
-        var rows = data.Rows.Select(r => new ResultRow(r)).ToList();
+        var rows = data.Rows.Select((r, idx) => new ResultRow(r) { RowNumber = idx + 1 }).ToList();
 
         _originalRows = rows.Select(r => new ResultRow(r.ToArray())).ToList();
         _currentRows = rows;
@@ -460,7 +494,7 @@ public partial class ResultsPanel : UserControl
         if (sender is not DataGrid grid || grid.ItemsSource is not List<ResultRow> rows)
             return;
 
-        var colIndex = grid.Columns.IndexOf(e.Column);
+        var colIndex = grid.Columns.IndexOf(e.Column) - 1; // -1 for row number column
         if (colIndex < 0) return;
 
         bool ascending;
@@ -482,6 +516,33 @@ public partial class ResultsPanel : UserControl
         }, new SmartComparer(ascending)).ToList();
 
         grid.ItemsSource = sorted;
+    }
+
+    private static IBrush? ResolveTypeBrush(string? dbTypeName)
+    {
+        if (string.IsNullOrEmpty(dbTypeName)) return null;
+        var t = dbTypeName.ToLowerInvariant();
+
+        // Numeric
+        if (t.Contains("int") || t.Contains("decimal") || t.Contains("numeric")
+            || t.Contains("float") || t.Contains("double") || t.Contains("real")
+            || t.Contains("money") || t.Contains("number"))
+            return ThemeColors.Get("DataTypeNumeric", "#e6b07a");
+
+        // Date / time
+        if (t.Contains("date") || t.Contains("time") || t.Contains("timestamp"))
+            return ThemeColors.Get("DataTypeDate", "#8be9fd");
+
+        // Boolean
+        if (t == "bit" || t.Contains("bool"))
+            return ThemeColors.Get("DataTypeBoolean", "#bd93f9");
+
+        // Binary
+        if (t.Contains("binary") || t.Contains("blob") || t.Contains("image"))
+            return ThemeColors.Get("DataTypeBinary", "#9aa0a6");
+
+        // String / unknown — use default cell foreground
+        return null;
     }
 
     private class SmartComparer(bool ascending) : IComparer<object?>

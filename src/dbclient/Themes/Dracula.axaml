@@ -1,6 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ae="using:AvaloniaEdit"
+        xmlns:converters="using:Avalonia.Controls.Converters"
         x:Class="dbclient.Themes.DraculaTheme">
 
     <Styles.Resources>
@@ -52,28 +53,59 @@
         <SolidColorBrush x:Key="CompletionText" Color="#f8f8f2"/>
         <SolidColorBrush x:Key="CompletionDescText" Color="#6272a4"/>
 
-        <!-- Tree node colors -->
+        <!-- Tree node colors: unified high-contrast normal text, db distinct -->
+        <SolidColorBrush x:Key="TreeNodeColor" Color="#f8f8f2"/>
         <SolidColorBrush x:Key="DatabaseNodeColor" Color="#bd93f9"/>
-        <SolidColorBrush x:Key="FolderNodeColor" Color="#6272a4"/>
-        <SolidColorBrush x:Key="TableNodeColor" Color="#8be9fd"/>
-        <SolidColorBrush x:Key="ViewNodeColor" Color="#50fa7b"/>
-        <SolidColorBrush x:Key="ProcNodeColor" Color="#ffb86c"/>
-        <SolidColorBrush x:Key="ColumnNodeColor" Color="#f8f8f2"/>
-        <SolidColorBrush x:Key="DefaultNodeColor" Color="#f8f8f2"/>
 
         <!-- DB-specific: Results grid -->
-        <SolidColorBrush x:Key="ResultsBackground" Color="#1E1F29"/>
-        <SolidColorBrush x:Key="ResultsHeaderBackground" Color="#282a36"/>
-        <SolidColorBrush x:Key="ResultsAlternateRow" Color="#242530"/>
+        <SolidColorBrush x:Key="ResultsBackground" Color="#161721"/>
+        <SolidColorBrush x:Key="ResultsHeaderBackground" Color="#1E1F29"/>
+        <SolidColorBrush x:Key="ResultsAlternateRow" Color="#1c1d26"/>
         <SolidColorBrush x:Key="ResultsGridLine" Color="#333445"/>
 
+        <!-- Data type colors -->
+        <SolidColorBrush x:Key="DataTypeNumeric" Color="#ffb86c"/>
+        <SolidColorBrush x:Key="DataTypeDate" Color="#8be9fd"/>
+        <SolidColorBrush x:Key="DataTypeBoolean" Color="#bd93f9"/>
+        <SolidColorBrush x:Key="DataTypeBinary" Color="#6272a4"/>
+        <SolidColorBrush x:Key="DataTypeNull" Color="#6272a4"/>
+
         <!-- DB-specific: Connection tree -->
-        <SolidColorBrush x:Key="TreeBackground" Color="#21222c"/>
+        <SolidColorBrush x:Key="TreeBackground" Color="#191a21"/>
+        <SolidColorBrush x:Key="SearchBoxBackground" Color="#13141a"/>
+        <SolidColorBrush x:Key="SearchBoxFocusBorder" Color="#44475a"/>
         <SolidColorBrush x:Key="TreeItemHover" Color="#383a46"/>
         <SolidColorBrush x:Key="TreeItemSelected" Color="#44475a"/>
         <SolidColorBrush x:Key="DatabaseIcon" Color="#bd93f9"/>
         <SolidColorBrush x:Key="TableIcon" Color="#8be9fd"/>
         <SolidColorBrush x:Key="ColumnIcon" Color="#50fa7b"/>
+
+        <!-- TreeView indent per nesting level (must redefine converter to pick up custom value) -->
+        <x:Double x:Key="TreeViewItemIndent">2</x:Double>
+        <converters:MarginMultiplierConverter Indent="{StaticResource TreeViewItemIndent}" Left="True" x:Key="TreeViewItemLeftMarginConverter"/>
+
+        <!-- TreeView chevron arrow color: high-contrast accent, distinct from text -->
+        <SolidColorBrush x:Key="TreeViewItemForeground" Color="#bd93f9"/>
+        <SolidColorBrush x:Key="TreeViewItemForegroundPointerOver" Color="#d6b6ff"/>
+        <SolidColorBrush x:Key="TreeViewItemForegroundPressed" Color="#d6b6ff"/>
+        <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="#d6b6ff"/>
+        <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPointerOver" Color="#d6b6ff"/>
+        <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPressed" Color="#d6b6ff"/>
+
+        <!-- Menu / ContextMenu (Fluent theme resources) -->
+        <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#21222c"/>
+        <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#44475a"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemBackground" Color="Transparent"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#44475a"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#5a5e73"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemBackgroundDisabled" Color="Transparent"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemForeground" Color="#f8f8f2"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver" Color="#f8f8f2"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemForegroundPressed" Color="#f8f8f2"/>
+        <SolidColorBrush x:Key="MenuFlyoutItemForegroundDisabled" Color="#6272a4"/>
+        <SolidColorBrush x:Key="MenuFlyoutSubItemChevron" Color="#6272a4"/>
+        <SolidColorBrush x:Key="MenuFlyoutSubItemChevronPointerOver" Color="#f8f8f2"/>
+        <SolidColorBrush x:Key="MenuFlyoutSubItemChevronSubMenuOpened" Color="#f8f8f2"/>
     </Styles.Resources>
 
     <Style Selector="Window">
@@ -82,7 +114,7 @@
     </Style>
 
     <Style Selector="ae|TextEditor">
-        <Setter Property="Background" Value="#1E1F29"/>
+        <Setter Property="Background" Value="#161721"/>
         <Setter Property="Foreground" Value="#e0e0e0"/>
         <Setter Property="LineNumbersForeground" Value="#6272a4"/>
         <Setter Property="FontFamily" Value="Consolas"/>
@@ -131,16 +163,21 @@
         <Setter Property="BorderBrush" Value="#44475a"/>
     </Style>
 
-    <!-- Scrollbar: always visible thumb, no expand animation -->
+    <!-- Scrollbar - override Fluent scale transforms so thumb is always full-width -->
     <Style Selector="ScrollBar">
         <Setter Property="Background" Value="#21222c"/>
         <Setter Property="AllowAutoHide" Value="False"/>
+        <Style.Resources>
+            <TransformOperations x:Key="VerticalSmallScrollThumbScaleTransform">none</TransformOperations>
+            <TransformOperations x:Key="HorizontalSmallScrollThumbScaleTransform">none</TransformOperations>
+        </Style.Resources>
     </Style>
 
     <Style Selector="ScrollBar /template/ Thumb">
         <Setter Property="Background" Value="#44475a"/>
         <Setter Property="MinWidth" Value="10"/>
         <Setter Property="MinHeight" Value="10"/>
+        <Setter Property="RenderTransform" Value="none"/>
     </Style>
 
     <Style Selector="ScrollBar:vertical">
@@ -172,7 +209,7 @@
     </Style>
 
     <Style Selector="TreeView">
-        <Setter Property="Background" Value="#21222c"/>
+        <Setter Property="Background" Value="#191a21"/>
     </Style>
 
     <Style Selector="TreeViewItem">
@@ -226,11 +263,6 @@
         <Setter Property="Width" Value="7"/>
         <Setter Property="Height" Value="7"/>
         <Setter Property="Stretch" Value="Uniform"/>
-        <Setter Property="Fill" Value="#908caa"/>
-    </Style>
-
-    <Style Selector="TreeViewItem /template/ ToggleButton#PART_ExpandCollapseChevron:pointerover /template/ Path">
-        <Setter Property="Fill" Value="#f8f8f2"/>
     </Style>
 
 
@@ -330,16 +362,26 @@
 
     <!-- DataGrid styles: compact rows -->
     <Style Selector="DataGrid">
-        <Setter Property="Background" Value="#1E1F29"/>
-        <Setter Property="RowBackground" Value="#1E1F29"/>
+        <Setter Property="Background" Value="#161721"/>
+        <Setter Property="RowBackground" Value="#161721"/>
         <Setter Property="BorderBrush" Value="#333445"/>
         <Setter Property="HorizontalGridLinesBrush" Value="#333445"/>
         <Setter Property="VerticalGridLinesBrush" Value="#333445"/>
         <Setter Property="RowHeight" Value="24"/>
     </Style>
+    <Style Selector="DataGrid ScrollBar">
+        <Setter Property="AllowAutoHide" Value="False"/>
+    </Style>
+    <Style Selector="DataGrid /template/ Rectangle#PART_BottomRightCorner">
+        <Setter Property="Fill" Value="#21222c"/>
+    </Style>
+    <Style Selector="DataGrid /template/ ScrollViewer /template/ Panel#PART_ScrollBarsSeparator">
+        <Setter Property="Background" Value="#21222c"/>
+        <Setter Property="Opacity" Value="1"/>
+    </Style>
 
     <Style Selector="DataGridColumnHeader">
-        <Setter Property="Background" Value="#282a36"/>
+        <Setter Property="Background" Value="#1E1F29"/>
         <Setter Property="Foreground" Value="#f8f8f2"/>
         <Setter Property="MinHeight" Value="26"/>
         <Setter Property="FontSize" Value="11"/>
@@ -387,6 +429,11 @@
 
     <Style Selector="DataGridCell ContentPresenter">
         <Setter Property="Foreground" Value="#e0e0e0"/>
+    </Style>
+
+    <!-- Current cell highlight -->
+    <Style Selector="DataGridCell:current">
+        <Setter Property="Background" Value="#44475a"/>
     </Style>
 
     <!-- GridSplitter -->

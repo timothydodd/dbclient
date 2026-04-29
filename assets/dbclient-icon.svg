@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4a0a0a"/>
+      <stop offset="100%" stop-color="#1a0000"/>
+    </linearGradient>
+    <linearGradient id="border" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#cc2233"/>
+      <stop offset="100%" stop-color="#881122"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect x="10" y="10" width="220" height="220" rx="36" ry="36" fill="url(#bg)" stroke="url(#border)" stroke-width="4"/>
+  <filter id="shadow">
+    <feOffset dx="2" dy="3" in="SourceAlpha" result="off"/>
+    <feGaussianBlur in="off" stdDeviation="2" result="blur"/>
+    <feFlood flood-color="#000000" flood-opacity="0.5" result="color"/>
+    <feComposite in="color" in2="blur" operator="in" result="shadow"/>
+    <feMerge>
+      <feMergeNode in="shadow"/>
+      <feMergeNode in="SourceGraphic"/>
+    </feMerge>
+  </filter>
+  <!-- "db" text -->
+  <text x="120" y="116" font-family="Arial, sans-serif" font-size="148" font-weight="600" fill="#e83245" text-anchor="middle" dominant-baseline="central" letter-spacing="-5" filter="url(#shadow)">db</text>
+</svg>

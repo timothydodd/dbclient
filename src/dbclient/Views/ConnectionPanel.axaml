@@ -2,38 +2,171 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:dbclient.ViewModels"
              xmlns:models="using:dbclient.Models"
-             x:Class="dbclient.Views.ConnectionPanel">
+             x:Class="dbclient.Views.ConnectionPanel"
+             x:DataType="vm:MainWindowViewModel">
+
+    <UserControl.Styles>
+        <!-- Flatten the inner focus/hover border on the search TextBox -->
+        <Style Selector="TextBox.searchbox /template/ Border#PART_BorderElement">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="TextBox.searchbox:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+        <Style Selector="TextBox.searchbox:focus /template/ Border#PART_BorderElement">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+        <Style Selector="TextBox.searchbox:focus-within /template/ Border#PART_BorderElement">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+    </UserControl.Styles>
 
     <Border Background="{DynamicResource PanelBackground}">
         <Panel>
             <!-- Main content: Schema tree -->
             <DockPanel x:Name="SchemaView">
-                <Border DockPanel.Dock="Top" Background="{DynamicResource PanelHeaderBackground}" Padding="10,6">
+                <!-- Connection Tab Strip -->
+                <Border DockPanel.Dock="Top" Background="{DynamicResource TitleBarBackground}">
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Click="ToggleConnectionsOverlay_Click"
-                                Background="Transparent" Padding="2" Width="22" Height="22" ToolTip.Tip="Connections">
-                            <Path Data="M12 2C6.48 2 2 4.02 2 6.5v11C2 19.98 6.48 22 12 22s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2z"
-                                  Fill="{DynamicResource MenuIconColor}" Stretch="Uniform" Width="11" Height="11"/>
-                        </Button>
-                        <Button DockPanel.Dock="Right" Click="RefreshSchema_Click"
-                                Background="Transparent" Padding="2" Width="22" Height="22" ToolTip.Tip="Refresh Schema">
-                            <Path Data="M17.65 6.35A7.96 7.96 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
-                                  Fill="{DynamicResource MenuIconColor}" Stretch="Uniform" Width="11" Height="11"/>
-                        </Button>
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Path Data="M3 3h18v18H3z" Stroke="{DynamicResource AccentColor}" StrokeThickness="1.5"
-                                  Stretch="Uniform" Width="12" Height="12" VerticalAlignment="Center"/>
-                            <TextBlock Text="SCHEMA" FontSize="11" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource PanelHeaderText}" Opacity="0.7" VerticalAlignment="Center"/>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button Click="RefreshSchema_Click"
+                                    Background="Transparent" Padding="2" Width="22" Height="22" ToolTip.Tip="Refresh Schema"
+                                    VerticalContentAlignment="Center" HorizontalContentAlignment="Center">
+                                <Path Data="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8 M21 3v5h-5 M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16 M8 16H3v5"
+                                      Stroke="{DynamicResource MenuIconColor}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="9" Height="9"/>
+                            </Button>
+                            <Button Click="ToggleConnectionsOverlay_Click"
+                                    Background="Transparent" Padding="2" Width="22" Height="22" ToolTip.Tip="Connections"
+                                    VerticalContentAlignment="Center" HorizontalContentAlignment="Center">
+                                <Path Data="M12 22v-5 M9 8V2 M15 8V2 M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z"
+                                      Stroke="{DynamicResource MenuIconColor}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="9" Height="9"/>
+                            </Button>
                         </StackPanel>
+                        <ListBox x:Name="ConnectionTabStrip"
+                                 ItemsSource="{Binding ConnectionTabs}"
+                                 SelectedItem="{Binding SelectedConnectionTab}"
+                                 Background="Transparent" BorderThickness="0" Padding="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="vm:ConnectionTabViewModel">
+                                    <Grid MinHeight="28" RowDefinitions="*,2">
+                                        <Grid.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Close" Click="CloseConnectionTab_Click" Tag="{Binding}"/>
+                                            </ContextMenu>
+                                        </Grid.ContextMenu>
+                                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4,2,4,2" Spacing="6">
+                                            <Border Width="4" CornerRadius="2"
+                                                    Background="{Binding TabColor}"
+                                                    VerticalAlignment="Stretch" Margin="0,2"/>
+                                            <TextBlock Text="{Binding DisplayName}"
+                                                       VerticalAlignment="Center" FontSize="11"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <Button Click="CloseConnectionTab_Click" Tag="{Binding}"
+                                                    Padding="0" Margin="4,0,0,0"
+                                                    Width="16" Height="16" Background="Transparent"
+                                                    Opacity="0.3" VerticalAlignment="Center"
+                                                    VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                                    Classes="tabclose">
+                                                <Path Data="M18 6 6 18M6 6l12 12"
+                                                      Stroke="{DynamicResource TabCloseIconColor}"
+                                                      StrokeThickness="2" StrokeLineCap="Round"
+                                                      Stretch="Uniform" Width="6" Height="6"/>
+                                            </Button>
+                                        </StackPanel>
+                                        <Border Grid.Row="1"
+                                                Background="{Binding TabColor}"
+                                                IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </DockPanel>
                 </Border>
+
+                <!-- Filter bar (always visible) -->
+                <Border DockPanel.Dock="Top" x:Name="FilterBar" Classes="filterbar"
+                        Background="{DynamicResource SearchBoxBackground}"
+                        BorderBrush="Transparent" BorderThickness="1"
+                        CornerRadius="14" Margin="6,6,6,4" Padding="12,0">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" x:Name="FilterOptionsButton"
+                                Background="Transparent" BorderThickness="0" Padding="4,0"
+                                ToolTip.Tip="Filter options">
+                            <Path Data="M3 6h18 M7 12h10 M10 18h4"
+                                  Stroke="{DynamicResource SecondaryText}" StrokeThickness="1.5"
+                                  StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="11" Height="11"/>
+                            <Button.Flyout>
+                                <Flyout Placement="BottomEdgeAlignedRight">
+                                    <StackPanel Spacing="6" Margin="6">
+                                        <TextBlock Text="Search in" FontSize="10"
+                                                   Foreground="{DynamicResource SecondaryText}"/>
+                                        <CheckBox x:Name="ScopeTablesCheckBox" Content="Tables"
+                                                  IsCheckedChanged="FilterScope_Changed" FontSize="11"/>
+                                        <CheckBox x:Name="ScopeColumnsCheckBox" Content="Columns"
+                                                  IsCheckedChanged="FilterScope_Changed" FontSize="11"/>
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <Button DockPanel.Dock="Right" Click="ClearFilter_Click"
+                                Background="Transparent" BorderThickness="0" Padding="4,0"
+                                ToolTip.Tip="Clear filter" Classes="filterclear">
+                            <Path Data="M18 6 6 18M6 6l12 12"
+                                  Stroke="{DynamicResource SecondaryText}" StrokeThickness="1.5"
+                                  StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="8" Height="8"/>
+                        </Button>
+                        <TextBox x:Name="FilterBox" Classes="searchbox"
+                                 Watermark="Filter tables, columns..."
+                                 Foreground="#f3f4f6"
+                                 FontSize="11" Height="26"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 VerticalContentAlignment="Center"
+                                 KeyDown="FilterBox_KeyDown"/>
+                    </DockPanel>
+                </Border>
+
+                <!-- Tree + connection-error overlay share the remaining space -->
+                <Panel>
+                    <Border x:Name="ConnectionErrorPanel" IsVisible="False"
+                            Background="{DynamicResource PanelBackground}" Padding="16,24">
+                        <StackPanel Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Top">
+                            <Path Data="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z M12 9v4 M12 17h.01"
+                                  Stroke="{DynamicResource ErrorColor}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                                  Stretch="Uniform" Width="32" Height="32" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Connection failed" FontWeight="SemiBold" FontSize="13"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="ConnectionErrorText" FontSize="11"
+                                       Foreground="{DynamicResource SecondaryText}"
+                                       TextWrapping="Wrap" TextAlignment="Center"
+                                       HorizontalAlignment="Center" MaxWidth="240"/>
+                            <Button Content="Retry" Click="RetryConnection_Click"
+                                    HorizontalAlignment="Center" Padding="20,6"/>
+                        </StackPanel>
+                    </Border>
 
                 <!-- Schema Tree - bound directly, no chained path -->
                 <TreeView x:Name="SchemaTree"
                           Background="Transparent" BorderThickness="0" Padding="2"
                           SelectionChanged="SchemaTree_SelectionChanged"
                           KeyDown="SchemaTree_KeyDown">
+                    <TreeView.Styles>
+                        <Style Selector="TreeViewItem" x:DataType="vm:ConnectionTreeNode">
+                            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                        </Style>
+                    </TreeView.Styles>
                     <TreeView.ItemTemplate>
                         <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="vm:ConnectionTreeNode">
                             <StackPanel Orientation="Horizontal" Spacing="4" Margin="-8,0,0,0"
@@ -41,7 +174,7 @@
                                         PointerPressed="TreeItem_PointerPressed"
                                         Tag="{Binding}">
                                 <TextBlock Text="{Binding Name}" FontSize="11"
-                                           Foreground="{Binding NameColor}"
+                                           Foreground="{Binding NameBrush}"
                                            VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding Detail}" FontSize="9"
                                            Foreground="{DynamicResource SecondaryText}"
@@ -50,6 +183,7 @@
                         </TreeDataTemplate>
                     </TreeView.ItemTemplate>
                 </TreeView>
+                </Panel>
             </DockPanel>
 
             <!-- Connections overlay -->
@@ -63,8 +197,8 @@
                                       StrokeThickness="1.5" StrokeLineCap="Round" Stretch="Uniform" Width="10" Height="10"/>
                             </Button>
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <Path Data="M12 2C6.48 2 2 4.02 2 6.5v11C2 19.98 6.48 22 12 22s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2z"
-                                      Fill="{DynamicResource AccentColor}" Stretch="Uniform" Width="12" Height="12" VerticalAlignment="Center"/>
+                                <Path Data="M12 22v-5 M9 8V2 M15 8V2 M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z"
+                                      Stroke="{DynamicResource AccentColor}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="12" Height="12" VerticalAlignment="Center"/>
                                 <TextBlock Text="CONNECTIONS" FontSize="11" FontWeight="SemiBold"
                                            Foreground="{DynamicResource PanelHeaderText}" Opacity="0.7" VerticalAlignment="Center"/>
                             </StackPanel>
