@@ -9,8 +9,8 @@
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         CanResize="False"
+        SystemDecorations="BorderOnly"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome"
         ExtendClientAreaTitleBarHeightHint="32">
 
     <DockPanel>

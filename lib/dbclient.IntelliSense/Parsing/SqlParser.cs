@@ -310,6 +310,15 @@ public class SqlParser : ISqlParser
                 context.LastKeyword = token;
                 break;
             }
+            else if (token == "BY" && i > 0 &&
+                     (tokens[i - 1].Equals("ORDER", StringComparison.OrdinalIgnoreCase) ||
+                      tokens[i - 1].Equals("GROUP", StringComparison.OrdinalIgnoreCase)))
+            {
+                context.Type = SqlContextType.WhereClause;
+                context.ExpectingColumnName = true;
+                context.LastKeyword = $"{tokens[i - 1].ToUpperInvariant()} BY";
+                break;
+            }
             else if (WhereKeywords.Contains(token))
             {
                 if (token == "ON" && IsAfterJoin(tokens, i))

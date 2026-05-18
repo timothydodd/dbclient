@@ -9,8 +9,8 @@
         CanResize="True"
         MinWidth="400"
         MinHeight="250"
+        SystemDecorations="BorderOnly"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome"
         ExtendClientAreaTitleBarHeightHint="32">
 
     <DockPanel>

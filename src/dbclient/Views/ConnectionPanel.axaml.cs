@@ -2,6 +2,7 @@ using System.Text;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -378,13 +379,7 @@ public partial class ConnectionPanel : UserControl
             menu.Items.Add(item);
         }
 
-        void InsertQuery(string sql)
-        {
-            if (connTab.QueryTabs.Count == 0) connTab.NewQueryTab();
-            var tab = connTab.SelectedQueryTab ?? connTab.QueryTabs.First();
-            connTab.SelectedQueryTab = tab;
-            tab.SetQueryText(sql);
-        }
+        void InsertQuery(string sql) => AppendToSelectedTab(connTab, sql);
 
         async void CopyToClipboard(string text)
         {
@@ -481,16 +476,36 @@ public partial class ConnectionPanel : UserControl
         var quoted = !string.IsNullOrEmpty(node.SchemaName)
             ? $"{QuoteName(node.SchemaName)}.{QuoteName(node.Name)}"
             : QuoteName(node.Name);
-        var query = $"SELECT * FROM {quoted}";
 
-        if (connTab.QueryTabs.Count == 0)
-            connTab.NewQueryTab();
+        var query = connTab.Config.Type switch
+        {
+            ConnectionType.MySql => $"SELECT * FROM {quoted} LIMIT 100",
+            ConnectionType.Sqlite => $"SELECT * FROM {quoted} LIMIT 100",
+            _ => $"SELECT TOP(100) * FROM {quoted}"
+        };
 
+        AppendToSelectedTab(connTab, query);
+        e.Handled = true;
+    }
+
+    private static void AppendToSelectedTab(ConnectionTabViewModel connTab, string sql)
+    {
+        if (connTab.QueryTabs.Count == 0) connTab.NewQueryTab();
         var tab = connTab.SelectedQueryTab ?? connTab.QueryTabs.First();
         connTab.SelectedQueryTab = tab;
 
-        tab.SetQueryText(query);
-        e.Handled = true;
+        var existing = tab.QueryText ?? "";
+        string combined;
+        if (string.IsNullOrWhiteSpace(existing))
+        {
+            combined = sql;
+        }
+        else
+        {
+            var sep = existing.EndsWith('\n') ? "\n" : "\n\n";
+            combined = existing.TrimEnd() + sep + sql;
+        }
+        tab.SetQueryText(combined);
     }
 
     private static string ScriptCreateTable(ConnectionTreeNode tableNode, ConnectionTabViewModel connTab)
