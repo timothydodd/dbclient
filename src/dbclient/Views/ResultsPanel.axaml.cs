@@ -38,6 +38,7 @@ public partial class ResultsPanel : UserControl
     private List<ResultRow>? _allRows; // Unfiltered rows for search
     private string[]? _columnNames;
     private readonly HashSet<int> _dirtyRows = new();
+    private EventHandler? _pinColumnWidthsHandler;
 
     public ResultsPanel()
     {
@@ -242,6 +243,39 @@ public partial class ResultsPanel : UserControl
         UpdateApplyButtonVisibility();
 
         grid.ItemsSource = rows;
+        PinColumnWidthsAfterLayout(grid);
+    }
+
+    /// <summary>
+    /// Columns start as <see cref="DataGridLength.Auto"/> so they size to content, but Auto
+    /// columns re-measure against whichever rows are currently realized — which makes them
+    /// jump/reflow during horizontal (and vertical) scrolling. Once the grid has measured the
+    /// initial view, pin each column to that width (absolute pixels) so it stays put. Row
+    /// virtualization is unaffected.
+    /// </summary>
+    private void PinColumnWidthsAfterLayout(DataGrid grid)
+    {
+        // Drop any pending handler from a previous (rapid) result load.
+        if (_pinColumnWidthsHandler != null)
+            grid.LayoutUpdated -= _pinColumnWidthsHandler;
+
+        _pinColumnWidthsHandler = (_, _) =>
+        {
+            // Wait until the freshly-added columns have actually been measured.
+            if (grid.Columns.Count == 0 || grid.Columns[0].ActualWidth <= 0)
+                return;
+
+            grid.LayoutUpdated -= _pinColumnWidthsHandler;
+            _pinColumnWidthsHandler = null;
+
+            foreach (var col in grid.Columns)
+            {
+                var w = col.ActualWidth;
+                if (w > 0)
+                    col.Width = new DataGridLength(w);
+            }
+        };
+        grid.LayoutUpdated += _pinColumnWidthsHandler;
     }
 
     // --- Change tracking ---
