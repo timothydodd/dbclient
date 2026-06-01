@@ -12,12 +12,29 @@ public class SqlServerConnection : ConnectionBase
     public bool Encrypted { get; set; }
     public SqlServerAuthMode AuthMode { get; set; } = SqlServerAuthMode.SqlLogin;
 
+    private static int _adProviderRegistered;
+
     public override async Task<IDbConnection> GetConnectionAsync(string database, CancellationToken ct = default)
     {
         EnsureSshTunnel();
+        if (AuthMode == SqlServerAuthMode.AzureDefault)
+            EnsureActiveDirectoryProvider();
         var con = new SqlConnection(BuildConnectionString(database));
         await con.OpenAsync(ct);
         return con;
+    }
+
+    // Microsoft.Data.SqlClient 6.0+ moved the Active Directory auth providers out of the core
+    // package, so "Authentication=Active Directory Default" fails with "cannot find an
+    // authentication provider for ActiveDirectoryDefault" until we register one. The provider
+    // ships in Microsoft.Data.SqlClient.Extensions.Azure; register it once per process.
+    private static void EnsureActiveDirectoryProvider()
+    {
+        if (Interlocked.Exchange(ref _adProviderRegistered, 1) != 0)
+            return;
+
+        var provider = new ActiveDirectoryAuthenticationProvider();
+        SqlAuthenticationProvider.SetProvider(SqlAuthenticationMethod.ActiveDirectoryDefault, provider);
     }
 
     public override async Task<DbMaster> LoadDatabasesAsync(CancellationToken ct = default)

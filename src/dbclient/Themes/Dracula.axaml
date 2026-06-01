@@ -74,7 +74,35 @@
         <SolidColorBrush x:Key="TreeBackground" Color="#191a21"/>
         <SolidColorBrush x:Key="SearchBoxBackground" Color="#13141a"/>
         <SolidColorBrush x:Key="SearchBoxFocusBorder" Color="#44475a"/>
+        <SolidColorBrush x:Key="SearchBoxBorder" Color="#383a4a"/>
         <SolidColorBrush x:Key="TreeItemHover" Color="#383a46"/>
+
+        <!-- Scrollbar (Fluent resource overrides) -->
+        <SolidColorBrush x:Key="ScrollViewerScrollBarsSeparatorBackground" Color="Transparent"/>
+        <SolidColorBrush x:Key="ScrollBarBackground" Color="Transparent"/>
+        <SolidColorBrush x:Key="ScrollBarBackgroundPointerOver" Color="#2a2c39"/>
+        <SolidColorBrush x:Key="ScrollBarForeground" Color="#6272a4"/>
+        <SolidColorBrush x:Key="ScrollBarBorderBrush" Color="Transparent"/>
+        <SolidColorBrush x:Key="ScrollBarTrackFill" Color="Transparent"/>
+        <SolidColorBrush x:Key="ScrollBarTrackFillPointerOver" Color="#2a2c39"/>
+        <SolidColorBrush x:Key="ScrollBarTrackStroke" Color="Transparent"/>
+        <SolidColorBrush x:Key="ScrollBarTrackStrokePointerOver" Color="Transparent"/>
+        <SolidColorBrush x:Key="ScrollBarThumbFill" Color="#44475a"/>
+        <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#6272a4"/>
+        <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#7384bd"/>
+        <SolidColorBrush x:Key="ScrollBarThumbFillDisabled" Color="#2a2c39"/>
+        <SolidColorBrush x:Key="ScrollBarPanningThumbBackground" Color="#44475a"/>
+        <SolidColorBrush x:Key="ScrollBarButtonArrowForeground" Color="#6272a4"/>
+        <SolidColorBrush x:Key="ScrollBarButtonArrowForegroundPointerOver" Color="#bd93f9"/>
+        <SolidColorBrush x:Key="ScrollBarButtonArrowForegroundPressed" Color="#f8f8f2"/>
+        <SolidColorBrush x:Key="ScrollBarButtonArrowForegroundDisabled" Color="#383a4a"/>
+        <SolidColorBrush x:Key="ScrollBarButtonBackground" Color="Transparent"/>
+        <SolidColorBrush x:Key="ScrollBarButtonBackgroundPointerOver" Color="#2a2c39"/>
+        <SolidColorBrush x:Key="ScrollBarButtonBackgroundPressed" Color="#383a4a"/>
+        <SolidColorBrush x:Key="ScrollBarButtonBorderBrush" Color="Transparent"/>
+        <SolidColorBrush x:Key="ScrollBarButtonBorderBrushPointerOver" Color="Transparent"/>
+        <SolidColorBrush x:Key="ScrollBarButtonBorderBrushPressed" Color="Transparent"/>
+        <SolidColorBrush x:Key="ScrollBarButtonBorderBrushDisabled" Color="Transparent"/>
         <SolidColorBrush x:Key="TreeItemSelected" Color="#44475a"/>
         <SolidColorBrush x:Key="DatabaseIcon" Color="#bd93f9"/>
         <SolidColorBrush x:Key="TableIcon" Color="#8be9fd"/>
@@ -165,7 +193,6 @@
 
     <!-- Scrollbar - override Fluent scale transforms so thumb is always full-width -->
     <Style Selector="ScrollBar">
-        <Setter Property="Background" Value="#21222c"/>
         <Setter Property="AllowAutoHide" Value="False"/>
         <Style.Resources>
             <TransformOperations x:Key="VerticalSmallScrollThumbScaleTransform">none</TransformOperations>
@@ -174,7 +201,6 @@
     </Style>
 
     <Style Selector="ScrollBar /template/ Thumb">
-        <Setter Property="Background" Value="#44475a"/>
         <Setter Property="MinWidth" Value="10"/>
         <Setter Property="MinHeight" Value="10"/>
         <Setter Property="RenderTransform" Value="none"/>
@@ -186,10 +212,6 @@
 
     <Style Selector="ScrollBar:horizontal">
         <Setter Property="Height" Value="14"/>
-    </Style>
-
-    <Style Selector="ScrollBar /template/ Thumb:pointerover">
-        <Setter Property="Background" Value="#6272a4"/>
     </Style>
 
     <Style Selector="TextBox">

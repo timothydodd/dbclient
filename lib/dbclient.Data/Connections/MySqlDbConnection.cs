@@ -61,7 +61,11 @@ public class MySqlDbConnection : ConnectionBase
                 string dataType = row.DATA_TYPE;
                 string objectType = row.OBJECT_TYPE;
                 string isNullable = row.IS_NULLABLE;
-                long? maxLength = row.CHARACTER_MAXIMUM_LENGTH;
+                // CHARACTER_MAXIMUM_LENGTH is bigint unsigned in information_schema, which
+                // MySql.Data returns as ulong; a dynamic ulong->long? assignment throws
+                // (no implicit conversion), so read it as object and convert safely.
+                object? maxLengthObj = row.CHARACTER_MAXIMUM_LENGTH;
+                string? maxLength = maxLengthObj?.ToString();
 
                 if (currentTable != tableName)
                 {
@@ -83,7 +87,7 @@ public class MySqlDbConnection : ConnectionBase
                 currentColumns?.Add(new DbColumn
                 {
                     Name = columnName,
-                    DataType = maxLength.HasValue ? $"{dataType}({maxLength})" : dataType,
+                    DataType = !string.IsNullOrEmpty(maxLength) ? $"{dataType}({maxLength})" : dataType,
                     IsNullable = isNullable == "YES"
                 });
             }

@@ -6,6 +6,10 @@
              x:DataType="vm:MainWindowViewModel">
 
     <UserControl.Styles>
+        <!-- Subtle border on the filter box, brightening to the accent while focused -->
+        <Style Selector="Border.filterbar:focus-within">
+            <Setter Property="BorderBrush" Value="{DynamicResource SearchBoxFocusBorder}"/>
+        </Style>
         <!-- Flatten the inner focus/hover border on the search TextBox -->
         <Style Selector="TextBox.searchbox /template/ Border#PART_BorderElement">
             <Setter Property="BorderThickness" Value="0"/>
@@ -98,7 +102,7 @@
                 <!-- Filter bar (always visible) -->
                 <Border DockPanel.Dock="Top" x:Name="FilterBar" Classes="filterbar"
                         Background="{DynamicResource SearchBoxBackground}"
-                        BorderBrush="Transparent" BorderThickness="1"
+                        BorderBrush="{DynamicResource SearchBoxBorder}" BorderThickness="1"
                         CornerRadius="14" Margin="6,6,6,4" Padding="12,0">
                     <DockPanel>
                         <Button DockPanel.Dock="Right" x:Name="FilterOptionsButton"
@@ -129,7 +133,7 @@
                         </Button>
                         <TextBox x:Name="FilterBox" Classes="searchbox"
                                  Watermark="Filter tables, columns..."
-                                 Foreground="#f3f4f6"
+                                 Foreground="{DynamicResource NormalText}"
                                  FontSize="11" Height="26"
                                  BorderThickness="0"
                                  Background="Transparent"

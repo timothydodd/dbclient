@@ -130,6 +130,15 @@
                     </ContextMenu>
                 </DataGrid.ContextMenu>
                 <DataGrid.Styles>
+                    <!-- The default DataGrid theme spans PART_RowsPresenter over the scrollbar
+                         tracks so the always-visible scrollbars float on top, hiding the last
+                         row / last column. Don't change its grid placement (that breaks the
+                         DataGrid's row-scroll measurement and makes the last row unreachable) —
+                         instead inset the presenter by the scrollbar thickness (14px each) so
+                         its content sits beside the always-visible scrollbars, not under them. -->
+                    <Style Selector="DataGrid /template/ DataGridRowsPresenter#PART_RowsPresenter">
+                        <Setter Property="Margin" Value="0,0,14,14"/>
+                    </Style>
                     <Style Selector="ScrollViewer">
                         <Setter Property="AllowAutoHide" Value="False"/>
                     </Style>
