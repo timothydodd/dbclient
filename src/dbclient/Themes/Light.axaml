@@ -462,13 +462,14 @@
 
     <Style Selector="DataGridCell">
         <Setter Property="Foreground" Value="#1e1e1e"/>
-        <Setter Property="Padding" Value="6,1"/>
+        <Setter Property="Padding" Value="0,1"/>
         <Setter Property="FontSize" Value="11"/>
     </Style>
 
     <Style Selector="DataGridCell TextBlock">
         <Setter Property="Foreground" Value="#1e1e1e"/>
         <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Padding" Value="6,0,0,0"/>
     </Style>
 
     <Style Selector="DataGridCell ContentPresenter">
@@ -478,6 +479,26 @@
     <!-- Current cell highlight -->
     <Style Selector="DataGridCell:current">
         <Setter Property="Background" Value="#dde8ff"/>
+    </Style>
+
+    <!-- In-cell editing TextBox: kill the default Fluent padding/gap and force a readable background -->
+    <Style Selector="DataGridCell TextBox">
+        <Setter Property="Padding" Value="6,0,0,0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Stretch"/>
+        <Setter Property="Foreground" Value="#111827"/>
+        <Setter Property="CaretBrush" Value="#111827"/>
+    </Style>
+    <Style Selector="DataGridCell TextBox /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="#ffffff"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="DataGridCell TextBox:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="#ffffff"/>
+        <Setter Property="BorderBrush" Value="#2563eb"/>
+        <Setter Property="BorderThickness" Value="0"/>
     </Style>
 
     <!-- GridSplitter -->

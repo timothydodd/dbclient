@@ -22,8 +22,10 @@ public class ResultRow
     public int RowNumber { get; set; }
     public string? this[int i]
     {
-        get => _values[i];
-        set => _values[i] = value;
+        // Bounds-safe: while switching result sets the grid can briefly evaluate a column binding
+        // (e.g. [2]) against a row from a different result set with fewer values.
+        get => (uint)i < (uint)_values.Length ? _values[i] : null;
+        set { if ((uint)i < (uint)_values.Length) _values[i] = value; }
     }
     public int Length => _values.Length;
     public string?[] ToArray() => (string?[])_values.Clone();
@@ -185,6 +187,12 @@ public partial class ResultsPanel : UserControl
         UpdateApplyButtonVisibility();
     }
 
+    /// <summary>The query that produced the current results (prefers the actually-executed text).</summary>
+    private string ResolveQueryText() =>
+        !string.IsNullOrWhiteSpace(_currentVm?.QueryTextToExecute)
+            ? _currentVm!.QueryTextToExecute
+            : _currentVm?.QueryText ?? "";
+
     private void UpdateGrid(ResultSet? data)
     {
         var grid = this.FindControl<DataGrid>("ResultsGrid");
@@ -197,6 +205,9 @@ public partial class ResultsPanel : UserControl
         }
 
         grid.AutoGenerateColumns = false;
+        // Detach old rows before rebuilding columns, otherwise a new column binding (e.g. [2]) can be
+        // evaluated against a still-attached row from the previous result set that has fewer values.
+        grid.ItemsSource = null;
         grid.Columns.Clear();
 
         _columnNames = data.ColumnNames;
@@ -219,12 +230,17 @@ public partial class ResultsPanel : UserControl
         });
         grid.FrozenColumnCount = 1;
 
+        // Rows are only editable when we can resolve a target table from the query — otherwise an
+        // UPDATE can't be generated, so don't let the user edit cells at all.
+        var editable = !string.IsNullOrEmpty(UpdateSqlGenerator.ParseTableName(ResolveQueryText()));
+
         for (int i = 0; i < _columnNames.Length; i++)
         {
             var col = new DataGridTextColumn
             {
                 Header = _columnNames[i],
-                Binding = new Avalonia.Data.Binding($"[{i}]")
+                Binding = new Avalonia.Data.Binding($"[{i}]"),
+                IsReadOnly = !editable
             };
 
             var typeBrush = ResolveTypeBrush(data.ColumnTypes.ElementAtOrDefault(i));
@@ -326,10 +342,8 @@ public partial class ResultsPanel : UserControl
         var connTab = GetConnectionTab();
         if (connTab == null) return;
 
-        var queryUsed = !string.IsNullOrWhiteSpace(_currentVm?.QueryTextToExecute)
-            ? _currentVm.QueryTextToExecute
-            : _currentVm?.QueryText ?? "";
-        var tableName = UpdateSqlGenerator.ParseTableName(queryUsed);
+        var tableRef = UpdateSqlGenerator.ParseTableRef(ResolveQueryText());
+        var tableName = tableRef?.Table;
         if (string.IsNullOrEmpty(tableName))
         {
             if (_currentVm != null)
@@ -341,7 +355,7 @@ public partial class ResultsPanel : UserControl
             return;
         }
 
-        var pkColumns = UpdateSqlGenerator.FindPrimaryKeyColumns(tableName, connTab);
+        var pkColumns = UpdateSqlGenerator.FindPrimaryKeyColumns(tableName, tableRef?.Schema, connTab);
         var sql = UpdateSqlGenerator.Generate(tableName, connTab.Config.Type, pkColumns,
             _columnNames, _originalRows, _currentRows, _dirtyRows);
 

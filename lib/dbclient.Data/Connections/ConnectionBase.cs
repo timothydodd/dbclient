@@ -44,56 +44,49 @@ public abstract class ConnectionBase : IDbConnectionProvider
         {
             using var con = await GetConnectionAsync(database, ct);
 
-            // Try to detect if it's a SELECT-like query
-            var trimmed = sql.TrimStart();
-            var isSelect = trimmed.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) ||
-                           trimmed.StartsWith("WITH", StringComparison.OrdinalIgnoreCase) ||
-                           trimmed.StartsWith("SHOW", StringComparison.OrdinalIgnoreCase) ||
-                           trimmed.StartsWith("DESCRIBE", StringComparison.OrdinalIgnoreCase) ||
-                           trimmed.StartsWith("EXPLAIN", StringComparison.OrdinalIgnoreCase) ||
-                           trimmed.StartsWith("PRAGMA", StringComparison.OrdinalIgnoreCase);
-
-            if (isSelect)
+            // Always use the reader path. It returns any result sets a batch
+            // produces (SELECT, EXEC of a proc, OUTPUT clauses, etc.) and falls
+            // back to the affected-row count when no rows are returned. Sniffing
+            // the leading keyword is unreliable — batches that start with a
+            // comment, DECLARE, SET, or EXEC can still return result sets.
+            result.Data = new List<ResultSet>();
+            using var cmd = ((DbConnection)con).CreateCommand();
+            cmd.CommandText = sql;
+            cmd.CommandTimeout = CommandTimeout;
+            using var reader = await cmd.ExecuteReaderAsync(ct);
+            do
             {
-                result.Data = new List<ResultSet>();
-                using var cmd = ((DbConnection)con).CreateCommand();
-                cmd.CommandText = sql;
-                cmd.CommandTimeout = CommandTimeout;
-                using var reader = await cmd.ExecuteReaderAsync(ct);
-                do
+                if (reader.FieldCount == 0) continue;
+
+                var rs = new ResultSet
                 {
-                    if (reader.FieldCount == 0) continue;
+                    ColumnNames = new string[reader.FieldCount],
+                    ColumnTypes = new string?[reader.FieldCount]
+                };
 
-                    var rs = new ResultSet
-                    {
-                        ColumnNames = new string[reader.FieldCount],
-                        ColumnTypes = new string?[reader.FieldCount]
-                    };
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    rs.ColumnNames[i] = reader.GetName(i);
+                    rs.ColumnTypes[i] = reader.GetDataTypeName(i);
+                }
 
+                while (await reader.ReadAsync(ct))
+                {
+                    if (MaxRows > 0 && rs.Rows.Count >= MaxRows) break;
+
+                    var values = new string?[reader.FieldCount];
                     for (int i = 0; i < reader.FieldCount; i++)
-                    {
-                        rs.ColumnNames[i] = reader.GetName(i);
-                        rs.ColumnTypes[i] = reader.GetDataTypeName(i);
-                    }
+                        values[i] = reader.IsDBNull(i) ? null : reader.GetValue(i)?.ToString();
+                    rs.Rows.Add(values);
+                }
 
-                    while (await reader.ReadAsync(ct))
-                    {
-                        if (MaxRows > 0 && rs.Rows.Count >= MaxRows) break;
+                result.Data.Add(rs);
+            } while (await reader.NextResultAsync(ct));
 
-                        var values = new string?[reader.FieldCount];
-                        for (int i = 0; i < reader.FieldCount; i++)
-                            values[i] = reader.IsDBNull(i) ? null : reader.GetValue(i)?.ToString();
-                        rs.Rows.Add(values);
-                    }
-
-                    result.Data.Add(rs);
-                } while (await reader.NextResultAsync(ct));
-                result.AffectedRows = result.Data.Sum(d => d.Rows.Count);
-            }
-            else
-            {
-                result.AffectedRows = await con.ExecuteAsync(new CommandDefinition(sql, commandTimeout: CommandTimeout, cancellationToken: ct));
-            }
+            // RecordsAffected is only valid after the reader is consumed/closed.
+            result.AffectedRows = result.Data.Count > 0
+                ? result.Data.Sum(d => d.Rows.Count)
+                : Math.Max(reader.RecordsAffected, 0);
         }
         catch (Exception ex)
         {

@@ -110,10 +110,18 @@ public class ConnectionTabViewModel : ViewModelBase
         set => SetField(ref _connectionError, value);
     }
 
+    private bool _isSchemaLoading;
+    public bool IsSchemaLoading
+    {
+        get => _isSchemaLoading;
+        set => SetField(ref _isSchemaLoading, value);
+    }
+
     public async Task ConnectAsync()
     {
         HasConnectionError = false;
         ConnectionError = "";
+        IsSchemaLoading = true;
 
         try
         {
@@ -142,6 +150,10 @@ public class ConnectionTabViewModel : ViewModelBase
             ConnectionError = ex.Message;
             HasConnectionError = true;
         }
+        finally
+        {
+            IsSchemaLoading = false;
+        }
     }
 
     public async Task SwitchDatabaseAsync(string database, bool force = false)
@@ -151,6 +163,7 @@ public class ConnectionTabViewModel : ViewModelBase
         ActivateDatabaseTabs(database);
         ActiveDatabase = database;
         StatusText = $"Loading {database}...";
+        IsSchemaLoading = true;
 
         try
         {
@@ -167,6 +180,10 @@ public class ConnectionTabViewModel : ViewModelBase
         catch (Exception ex)
         {
             StatusText = $"Schema load failed: {ex.Message}";
+        }
+        finally
+        {
+            IsSchemaLoading = false;
         }
     }
 

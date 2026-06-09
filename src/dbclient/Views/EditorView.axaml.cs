@@ -2,6 +2,7 @@ using System.Xml;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
+using Avalonia;
 using AvaloniaEdit;
 using AvaloniaEdit.CodeCompletion;
 using AvaloniaEdit.Highlighting;
@@ -32,6 +33,13 @@ public partial class EditorView : UserControl
         {
             // Load SQL syntax highlighting
             _editor.SyntaxHighlighting = GetSqlHighlighting();
+            ApplyThemeHighlightColors();
+            Services.ThemeColors.ThemeChanged += OnThemeChanged;
+            DetachedFromVisualTree += (_, _) => Services.ThemeColors.ThemeChanged -= OnThemeChanged;
+
+            // Line numbers are enabled via the theme style, which populates the left margins after the
+            // control attaches — add a gap between the line-number margin and the code text once present.
+            _editor.AttachedToVisualTree += (_, _) => ApplyLineNumberPadding();
 
             _editor.TextArea.TextEntered += OnTextEntered;
             _editor.TextArea.TextEntering += OnTextEntering;
@@ -72,6 +80,53 @@ public partial class EditorView : UserControl
         }
 
         return _sqlHighlighting;
+    }
+
+    private void ApplyLineNumberPadding()
+    {
+        if (_editor == null) return;
+        // Gap between the line-number margin and the code: inset the TextView from the left.
+        _editor.TextArea.TextView.Margin = new Thickness(10, 0, 0, 0);
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        ApplyThemeHighlightColors();
+        _editor?.TextArea.TextView.Redraw();
+    }
+
+    /// <summary>
+    /// The shared SQL highlighting is loaded from a fixed xshd whose colors are tuned for dark
+    /// backgrounds (comments/numbers/operators are light grays that disappear on white). Re-tint the
+    /// named colors to suit the active theme so the editor stays readable in Light/Dracula too.
+    /// </summary>
+    private static void ApplyThemeHighlightColors()
+    {
+        if (_sqlHighlighting == null) return;
+        var theme = App.Instance?.CurrentThemeName ?? "Dark";
+
+        // (String, Comment, Keyword, Function, DataType, Number, Operator)
+        var (str, comment, keyword, func, dataType, number, op) = theme switch
+        {
+            "Light"   => ("#A31515", "#008000", "#0033B3", "#795E26", "#267F99", "#098658", "#374151"),
+            "Dracula" => ("#f1fa8c", "#6272a4", "#ff79c6", "#8be9fd", "#8be9fd", "#bd93f9", "#ff79c6"),
+            _         => ("#D2BE3F", "#595959", "#558cb1", "#2B91AF", "#F9523D", "#c7c7c7", "#DBE6EC"),
+        };
+
+        SetHighlightColor("String", str);
+        SetHighlightColor("Comment", comment);
+        SetHighlightColor("Keyword", keyword);
+        SetHighlightColor("Function", func);
+        SetHighlightColor("DataType", dataType);
+        SetHighlightColor("Number", number);
+        SetHighlightColor("Operator", op);
+    }
+
+    private static void SetHighlightColor(string name, string hex)
+    {
+        var color = _sqlHighlighting?.GetNamedColor(name);
+        if (color != null)
+            color.Foreground = new SimpleHighlightingBrush(Avalonia.Media.Color.Parse(hex));
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)

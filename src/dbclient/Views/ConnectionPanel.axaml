@@ -30,6 +30,20 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
         </Style>
+        <!-- Skeleton loader blocks: rounded bars that pulse while schema is loading -->
+        <Style Selector="Border.skeleton">
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Height" Value="11"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="Background" Value="{DynamicResource SearchBoxBackground}"/>
+            <Style.Animations>
+                <Animation Duration="0:0:1.3" IterationCount="INFINITE">
+                    <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.35"/></KeyFrame>
+                    <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0.9"/></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.35"/></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
     </UserControl.Styles>
 
     <Border Background="{DynamicResource PanelBackground}">
@@ -187,6 +201,24 @@
                         </TreeDataTemplate>
                     </TreeView.ItemTemplate>
                 </TreeView>
+
+                <!-- Skeleton loader: shown while connecting / refreshing schema -->
+                <Border x:Name="SchemaLoadingPanel" IsVisible="False"
+                        Background="{DynamicResource PanelBackground}" Padding="10,10">
+                    <StackPanel Spacing="11" VerticalAlignment="Top">
+                        <Border Classes="skeleton" Width="150"/>
+                        <Border Classes="skeleton" Width="96"  Margin="16,0,0,0"/>
+                        <Border Classes="skeleton" Width="120" Margin="16,0,0,0"/>
+                        <Border Classes="skeleton" Width="78"  Margin="16,0,0,0"/>
+                        <Border Classes="skeleton" Width="134" Margin="16,0,0,0"/>
+                        <Border Classes="skeleton" Width="140"/>
+                        <Border Classes="skeleton" Width="88"  Margin="16,0,0,0"/>
+                        <Border Classes="skeleton" Width="110" Margin="16,0,0,0"/>
+                        <Border Classes="skeleton" Width="72"  Margin="16,0,0,0"/>
+                        <Border Classes="skeleton" Width="126" Margin="16,0,0,0"/>
+                        <Border Classes="skeleton" Width="100" Margin="16,0,0,0"/>
+                    </StackPanel>
+                </Border>
                 </Panel>
             </DockPanel>
 

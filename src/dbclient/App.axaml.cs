@@ -14,6 +14,9 @@ public partial class App : Application
 
     public static App? Instance => Current as App;
 
+    /// <summary>Name of the currently applied theme ("Dark", "Light", "Dracula").</summary>
+    public string CurrentThemeName { get; private set; } = "Dark";
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -21,6 +24,12 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+#if DEBUG
+        // Avalonia 12: DevTools moved to AvaloniaUI.DiagnosticsSupport; the new AttachDeveloperTools()
+        // extension targets the Application (not a Window). Opens the visual inspector with F12.
+        this.AttachDeveloperTools();
+#endif
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var viewModel = new MainWindowViewModel();
@@ -52,6 +61,12 @@ public partial class App : Application
             "Dracula" => new DraculaTheme(),
             "Light" => new LightTheme(),
             _ => new DarkTheme()
+        };
+        CurrentThemeName = themeName switch
+        {
+            "Dracula" => "Dracula",
+            "Light" => "Light",
+            _ => "Dark"
         };
         Styles.Add(_theme);
         Services.ThemeColors.NotifyThemeChanged();

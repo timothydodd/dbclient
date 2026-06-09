@@ -199,25 +199,30 @@ public partial class ConnectionPanel : UserControl
         _errorTabHandler = (_, args) =>
         {
             if (args.PropertyName is nameof(ConnectionTabViewModel.HasConnectionError)
-                or nameof(ConnectionTabViewModel.ConnectionError))
-                UpdateErrorOverlay();
+                or nameof(ConnectionTabViewModel.ConnectionError)
+                or nameof(ConnectionTabViewModel.IsSchemaLoading))
+                UpdateOverlays();
         };
         if (connTab != null)
             connTab.PropertyChanged += _errorTabHandler;
 
-        UpdateErrorOverlay();
+        UpdateOverlays();
     }
 
-    private void UpdateErrorOverlay()
+    private void UpdateOverlays()
     {
         var panel = this.FindControl<Border>("ConnectionErrorPanel");
         var text = this.FindControl<TextBlock>("ConnectionErrorText");
         var tree = this.FindControl<TreeView>("SchemaTree");
+        var loading = this.FindControl<Border>("SchemaLoadingPanel");
         if (panel == null) return;
 
         var hasError = _errorBoundTab?.HasConnectionError == true;
+        var isLoading = _errorBoundTab?.IsSchemaLoading == true && !hasError;
+
         panel.IsVisible = hasError;
-        if (tree != null) tree.IsVisible = !hasError;
+        if (loading != null) loading.IsVisible = isLoading;
+        if (tree != null) tree.IsVisible = !hasError && !isLoading;
         if (text != null) text.Text = _errorBoundTab?.ConnectionError ?? "";
     }
 

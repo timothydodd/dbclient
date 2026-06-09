@@ -75,32 +75,63 @@ public static class UpdateSqlGenerator
     }
 
     public static HashSet<string> FindPrimaryKeyColumns(string tableName, ConnectionTabViewModel connTab)
+        => FindPrimaryKeyColumns(tableName, null, connTab);
+
+    /// <summary>
+    /// Locate the table node anywhere in the schema tree (it may be nested under a Schema node when the
+    /// database groups by schema) and return the names of its primary-key columns. When <paramref name="schema"/>
+    /// is supplied, it disambiguates same-named tables across schemas.
+    /// </summary>
+    public static HashSet<string> FindPrimaryKeyColumns(string tableName, string? schema, ConnectionTabViewModel connTab)
     {
         var pkColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var dbNode in connTab.ConnectionTree)
+        var tableNode = FindTableNode(connTab.ConnectionTree, tableName, schema);
+        if (tableNode == null) return pkColumns;
+
+        foreach (var colNode in tableNode.Children)
         {
-            foreach (var folder in dbNode.Children)
-            {
-                foreach (var tableNode in folder.Children)
-                {
-                    if (tableNode.Name.Equals(tableName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        foreach (var colNode in tableNode.Children)
-                        {
-                            if (colNode.Detail?.Contains(" PK") == true)
-                                pkColumns.Add(colNode.Name);
-                        }
-                        return pkColumns;
-                    }
-                }
-            }
+            if (colNode.NodeType == ConnectionTreeNodeType.Column && colNode.Detail?.Contains(" PK") == true)
+                pkColumns.Add(colNode.Name);
         }
 
         return pkColumns;
     }
 
+    private static ConnectionTreeNode? FindTableNode(
+        IEnumerable<ConnectionTreeNode> nodes, string tableName, string? schema)
+    {
+        ConnectionTreeNode? schemaMismatch = null;
+
+        foreach (var node in nodes)
+        {
+            if (node.NodeType is ConnectionTreeNodeType.Table or ConnectionTreeNodeType.View
+                && node.Name.Equals(tableName, StringComparison.OrdinalIgnoreCase))
+            {
+                // Prefer a schema match when we know it; otherwise remember as a fallback.
+                if (string.IsNullOrEmpty(schema)
+                    || string.IsNullOrEmpty(node.SchemaName)
+                    || node.SchemaName.Equals(schema, StringComparison.OrdinalIgnoreCase))
+                {
+                    return node;
+                }
+                schemaMismatch ??= node;
+                continue;
+            }
+
+            var found = FindTableNode(node.Children, tableName, schema);
+            if (found != null) return found;
+        }
+
+        return schemaMismatch;
+    }
+
+    /// <summary>Parses just the table name from a query's FROM clause (schema stripped).</summary>
     public static string? ParseTableName(string queryText)
+        => ParseTableRef(queryText)?.Table;
+
+    /// <summary>Parses the FROM clause into its optional schema and table name.</summary>
+    public static (string? Schema, string Table)? ParseTableRef(string queryText)
     {
         if (string.IsNullOrWhiteSpace(queryText)) return null;
 
@@ -111,8 +142,13 @@ public static class UpdateSqlGenerator
 
         var raw = match.Groups[1].Value;
         raw = raw.Replace("[", "").Replace("]", "").Replace("`", "").Replace("\"", "").Replace("'", "");
+
         if (raw.Contains('.'))
-            raw = raw.Split('.').Last().Trim();
-        return raw;
+        {
+            var parts = raw.Split('.');
+            return (parts[^2].Trim(), parts[^1].Trim());
+        }
+
+        return (null, raw.Trim());
     }
 }
