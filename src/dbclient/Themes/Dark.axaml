@@ -43,6 +43,7 @@
         <SolidColorBrush x:Key="TableColor" Color="#2B91AF"/>
         <SolidColorBrush x:Key="ColumnColor" Color="#7aba7a"/>
         <SolidColorBrush x:Key="AliasColor" Color="#D2BE3F"/>
+        <SolidColorBrush x:Key="SchemaColor" Color="#C586C0"/>
 
         <!-- Results grid -->
         <SolidColorBrush x:Key="ResultsBackground" Color="#141414"/>

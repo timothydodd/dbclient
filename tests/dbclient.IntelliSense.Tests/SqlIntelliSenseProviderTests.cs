@@ -102,3 +102,85 @@ public class SqlIntelliSenseProviderTests
         Assert.DoesNotContain(items, i => i.Text == "Orders");
     }
 }
+
+public class SchemaAwareMockProvider : ISchemaProvider
+{
+    public string? DefaultSchema => "dbo";
+
+    public Task<IList<DbTable>> GetTablesAsync(CancellationToken ct = default) =>
+        Task.FromResult<IList<DbTable>>(new List<DbTable>
+        {
+            new("Users", "dbo"),
+            new("Orders", "dbo"),
+            new("PartnerUser", "partner")
+        });
+
+    public Task<IList<DbColumn>> GetColumnsAsync(string tableName, CancellationToken ct = default)
+    {
+        IList<DbColumn> cols = tableName switch
+        {
+            "Users" or "dbo.Users" => [new("Id", "int") { IsPrimaryKey = true }, new("Name", "varchar")],
+            "PartnerUser" or "partner.PartnerUser" => [new("Id", "int") { IsPrimaryKey = true }, new("PartnerId", "int")],
+            _ => []
+        };
+        return Task.FromResult(cols);
+    }
+
+    public Task<IList<string>> GetKeywordsAsync(CancellationToken ct = default) =>
+        Task.FromResult<IList<string>>(new List<string> { "SELECT", "FROM", "WHERE" });
+}
+
+public class SchemaCompletionTests
+{
+    private async Task<SqlIntelliSenseProvider> CreateProvider()
+    {
+        var provider = new SqlIntelliSenseProvider();
+        await provider.InitializeAsync(new SchemaAwareMockProvider());
+        return provider;
+    }
+
+    [Fact]
+    public async Task FromClause_OffersSchemaNames()
+    {
+        var provider = await CreateProvider();
+        var items = await provider.GetCompletionsAsync("SELECT * FROM ", 14);
+        Assert.Contains(items, i => i.Text == "partner" && i.Type == CompletionType.Schema);
+        Assert.Contains(items, i => i.Text == "dbo" && i.Type == CompletionType.Schema);
+    }
+
+    [Fact]
+    public async Task FromClause_SchemaMatchesTypedPrefix()
+    {
+        var sql = "SELECT DISTINCT * FROM partner";
+        var provider = await CreateProvider();
+        var items = await provider.GetCompletionsAsync(sql, sql.Length);
+        Assert.Contains(items, i => i.Text == "partner" && i.Type == CompletionType.Schema);
+    }
+
+    [Fact]
+    public async Task FromClause_NonDefaultSchemaTable_InsertsQualified()
+    {
+        var provider = await CreateProvider();
+        var items = await provider.GetCompletionsAsync("SELECT * FROM ", 14);
+        Assert.Contains(items, i => i.Text == "partner.PartnerUser" && i.Type == CompletionType.Table);
+        Assert.DoesNotContain(items, i => i.Text == "PartnerUser");
+    }
+
+    [Fact]
+    public async Task FromClause_DefaultSchemaTable_InsertsBare()
+    {
+        var provider = await CreateProvider();
+        var items = await provider.GetCompletionsAsync("SELECT * FROM ", 14);
+        Assert.Contains(items, i => i.Text == "Users" && i.Type == CompletionType.Table);
+        Assert.DoesNotContain(items, i => i.Text == "dbo.Users");
+    }
+
+    [Fact]
+    public async Task SchemaDot_OffersSchemaTables()
+    {
+        var sql = "SELECT * FROM partner.";
+        var provider = await CreateProvider();
+        var items = await provider.GetCompletionsAsync(sql, sql.Length);
+        Assert.Contains(items, i => i.Text == "PartnerUser" && i.Type == CompletionType.Table);
+    }
+}

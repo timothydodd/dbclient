@@ -19,6 +19,9 @@ public class SchemaService : ISchemaProvider
         _database = database;
     }
 
+    // Unqualified names resolve to dbo on SQL Server; MySQL/SQLite don't populate table schemas
+    public string? DefaultSchema => _connection.ConnectionType == "SQL Server" ? "dbo" : null;
+
     public async Task<IList<IntellisenseModels.DbTable>> GetTablesAsync(CancellationToken cancellationToken = default)
     {
         if (_cachedTables != null)
@@ -32,27 +35,41 @@ public class SchemaService : ISchemaProvider
         foreach (var table in dbSchema.Tables)
         {
             _cachedTables.Add(new IntellisenseModels.DbTable(table.Name, table.Schema));
-            _cachedColumns[table.Name] = table.Columns
+            var columns = table.Columns
                 .Select(c => new IntellisenseModels.DbColumn(c.Name, c.DataType)
                 {
                     IsPrimaryKey = c.IsPrimaryKey,
                     IsNullable = c.IsNullable
                 })
                 .ToList<IntellisenseModels.DbColumn>();
+            CacheColumns(table.Name, table.Schema, columns);
         }
 
         foreach (var view in dbSchema.Views)
         {
             _cachedTables.Add(new IntellisenseModels.DbTable(view.Name, view.Schema));
-            _cachedColumns[view.Name] = view.Columns
+            var columns = view.Columns
                 .Select(c => new IntellisenseModels.DbColumn(c.Name, c.DataType)
                 {
                     IsNullable = c.IsNullable
                 })
                 .ToList<IntellisenseModels.DbColumn>();
+            CacheColumns(view.Name, view.Schema, columns);
         }
 
         return _cachedTables;
+    }
+
+    /// <summary>
+    /// Caches under both the bare name and "schema.name" so schema-qualified references resolve.
+    /// On a bare-name collision across schemas the first table wins; the qualified key stays exact.
+    /// </summary>
+    private void CacheColumns(string name, string schema, IList<IntellisenseModels.DbColumn> columns)
+    {
+        if (!_cachedColumns!.ContainsKey(name))
+            _cachedColumns[name] = columns;
+        if (!string.IsNullOrEmpty(schema))
+            _cachedColumns[$"{schema}.{name}"] = columns;
     }
 
     public async Task<IList<IntellisenseModels.DbColumn>> GetColumnsAsync(string tableName, CancellationToken cancellationToken = default)
@@ -61,6 +78,11 @@ public class SchemaService : ISchemaProvider
             await GetTablesAsync(cancellationToken);
 
         if (_cachedColumns!.TryGetValue(tableName, out var columns))
+            return columns;
+
+        // Qualified name whose prefix isn't a known schema (e.g. MySQL "db.table") — try the bare name
+        var lastDot = tableName.LastIndexOf('.');
+        if (lastDot >= 0 && _cachedColumns.TryGetValue(tableName[(lastDot + 1)..], out columns))
             return columns;
 
         return [];

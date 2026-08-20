@@ -43,6 +43,7 @@
         <SolidColorBrush x:Key="TableColor" Color="#8be9fd"/>
         <SolidColorBrush x:Key="ColumnColor" Color="#50fa7b"/>
         <SolidColorBrush x:Key="AliasColor" Color="#ffb86c"/>
+        <SolidColorBrush x:Key="SchemaColor" Color="#bd93f9"/>
 
         <!-- Message colors -->
         <SolidColorBrush x:Key="ErrorColor" Color="#ff5555"/>

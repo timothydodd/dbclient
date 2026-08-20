@@ -14,6 +14,13 @@ public interface ISchemaProvider
     Task<IList<DbTable>> GetTablesAsync(CancellationToken cancellationToken = default);
     Task<IList<DbColumn>> GetColumnsAsync(string tableName, CancellationToken cancellationToken = default);
     Task<IList<string>> GetKeywordsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Schema that unqualified table names resolve to (e.g. "dbo" on SQL Server).
+    /// Tables outside this schema must be completed schema-qualified. Null when the
+    /// dialect has no schema concept.
+    /// </summary>
+    string? DefaultSchema => null;
 }
 
 public interface ISqlParser

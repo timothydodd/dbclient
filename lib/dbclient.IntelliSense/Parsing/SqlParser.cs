@@ -43,7 +43,12 @@ public class SqlParser : ISqlParser
             if (queryTokens.Count == 0)
                 return new SqlContext { Type = SqlContextType.General };
 
-            var context = DetermineContext(queryTokens);
+            // Whether the caret sits immediately after an identifier character — i.e. the user is
+            // still typing the last token ("FROM Cust|") vs. done with it ("FROM Customers |").
+            var caretAtWordEnd = caretPosition > 0 && caretPosition <= sqlText.Length &&
+                (char.IsLetterOrDigit(sqlText[caretPosition - 1]) || sqlText[caretPosition - 1] == '_');
+
+            var context = DetermineContext(queryTokens, caretAtWordEnd);
             context.CurrentQuery = string.Join(" ", queryTokens);
             context.AllTokens = queryTokens;
 
@@ -77,9 +82,10 @@ public class SqlParser : ISqlParser
 
         if (checkPosition >= 0 && sqlText[checkPosition] == '.')
         {
-            var tablePrefix = ExtractIdentifierBefore(sqlText, checkPosition);
+            var tablePrefix = ExtractQualifiedIdentifierBefore(sqlText, checkPosition);
 
-            if (!string.IsNullOrEmpty(tablePrefix))
+            // "1." is a decimal literal being typed, not a column reference
+            if (!string.IsNullOrEmpty(tablePrefix) && !tablePrefix.All(char.IsDigit))
             {
                 var allQueryTokens = TokenizeSQL(sqlText).ToList();
                 allQueryTokens.Insert(0, "SELECT");
@@ -99,22 +105,41 @@ public class SqlParser : ISqlParser
         return null;
     }
 
-    private static string ExtractIdentifierBefore(string sqlText, int dotPosition)
+    /// <summary>
+    /// Extracts the (possibly schema-qualified) identifier ending at <paramref name="dotPosition"/>,
+    /// e.g. "dbo.Orders." → "dbo.Orders". Handles [bracketed], "quoted" and `backticked` parts.
+    /// </summary>
+    private static string ExtractQualifiedIdentifierBefore(string sqlText, int dotPosition)
     {
         var identifier = new StringBuilder();
 
-        for (int i = dotPosition - 1; i >= 0; i--)
+        int i = dotPosition - 1;
+        while (i >= 0)
         {
             char c = sqlText[i];
 
             if (char.IsLetterOrDigit(c) || c == '_')
             {
                 identifier.Insert(0, c);
+                i--;
             }
-            else if (char.IsWhiteSpace(c))
+            else if (c == ']' || c == '`' || c == '"')
             {
-                if (identifier.Length > 0)
-                    break;
+                // Quoted identifier part: copy its contents without the delimiters
+                char open = c == ']' ? '[' : c;
+                i--;
+                while (i >= 0 && sqlText[i] != open)
+                {
+                    identifier.Insert(0, sqlText[i]);
+                    i--;
+                }
+                i--; // skip the opening delimiter
+            }
+            else if (c == '.' && identifier.Length > 0)
+            {
+                // Continue into the schema/qualifier part
+                identifier.Insert(0, '.');
+                i--;
             }
             else
             {
@@ -178,7 +203,7 @@ public class SqlParser : ISqlParser
         return upperToken is "SELECT" or "INSERT" or "UPDATE" or "DELETE" or "CREATE" or "ALTER" or "DROP";
     }
 
-    private static SqlContext DetermineContext(List<string> tokens)
+    private static SqlContext DetermineContext(List<string> tokens, bool caretAtWordEnd)
     {
         var context = new SqlContext { Type = SqlContextType.General };
 
@@ -210,7 +235,9 @@ public class SqlParser : ISqlParser
 
         if (tokens.Count == 1)
         {
-            if (IsPartialKeyword(currentToken))
+            // Only treat the word as a partially typed keyword while the caret still touches it —
+            // "SELEC|" is partial, but after "SELECT |" the clause context below must decide.
+            if (caretAtWordEnd && IsPartialKeyword(currentToken))
             {
                 context.Type = SqlContextType.General;
                 context.ExpectingKeyword = true;
@@ -230,83 +257,67 @@ public class SqlParser : ISqlParser
 
             if (token == "SELECT")
             {
+                // Note: the backward scan hits any FROM/JOIN/WHERE token before reaching SELECT,
+                // so at this point there is no clause keyword between SELECT and the caret.
                 var tokensAfterSelect = tokens.Skip(i + 1).ToList();
+
+                context.Type = SqlContextType.SelectList;
+                context.LastKeyword = "SELECT";
 
                 if (tokensAfterSelect.Count == 0)
                 {
-                    context.Type = SqlContextType.SelectList;
                     context.ExpectingColumnName = true;
-                    context.LastKeyword = "SELECT";
-                }
-                else if (HasFromKeyword(tokensAfterSelect))
-                {
-                    var fromIndex = -1;
-                    for (int j = 0; j < tokensAfterSelect.Count; j++)
-                    {
-                        if (FromKeywords.Contains(tokensAfterSelect[j].ToUpperInvariant()))
-                        {
-                            fromIndex = j;
-                            break;
-                        }
-                    }
-
-                    if (fromIndex >= 0)
-                    {
-                        var tokensBeforeFrom = tokensAfterSelect.Take(fromIndex).ToList();
-                        var lastTokenBeforeFrom = tokensBeforeFrom.LastOrDefault()?.ToUpperInvariant();
-
-                        if (string.IsNullOrEmpty(lastTokenBeforeFrom) ||
-                            lastTokenBeforeFrom == "," ||
-                            IsPartialWord(lastTokenBeforeFrom))
-                        {
-                            context.Type = SqlContextType.SelectList;
-                            context.ExpectingColumnName = true;
-                            context.LastKeyword = "SELECT";
-                        }
-                        else
-                        {
-                            var fromContext = AnalyzeFromContext(tokensAfterSelect);
-                            context.Type = fromContext.Type;
-                            context.LastKeyword = fromContext.LastKeyword;
-                            context.ExpectingTableName = fromContext.ExpectingTableName;
-                            context.ExpectingColumnName = fromContext.ExpectingColumnName;
-                            context.ExpectingKeyword = fromContext.ExpectingKeyword;
-                            foreach (var alias in fromContext.TableAliases)
-                                context.TableAliases[alias.Key] = alias.Value;
-                            context.AvailableAliases = context.TableAliases.Keys.ToList();
-                        }
-                    }
                 }
                 else
                 {
                     var lastTokenAfterSelect = tokensAfterSelect.Last().ToUpperInvariant();
 
-                    if (IsPartialFromKeyword(lastTokenAfterSelect))
+                    if (IsPartialFromKeyword(lastTokenAfterSelect) ||
+                        tokensAfterSelect.Contains("*") ||
+                        !IsPartialWord(tokensAfterSelect[0]))
                     {
-                        context.Type = SqlContextType.SelectList;
                         context.ExpectingKeyword = true;
-                        context.LastKeyword = "SELECT";
-                    }
-                    else if (tokensAfterSelect.Contains("*") ||
-                            (tokensAfterSelect.Count >= 1 && !IsPartialWord(tokensAfterSelect[0])))
-                    {
-                        context.Type = SqlContextType.SelectList;
-                        context.ExpectingKeyword = true;
-                        context.LastKeyword = "SELECT";
                     }
                     else
                     {
-                        context.Type = SqlContextType.SelectList;
                         context.ExpectingColumnName = true;
-                        context.LastKeyword = "SELECT";
                     }
                 }
                 break;
             }
+            else if ((token == "GROUP" || token == "ORDER") && i >= tokens.Count - 2)
+            {
+                // "... GROUP |" or "... ORDER B|" — the only valid continuation is BY.
+                // Skip when the word sits in table position (it's a table named Group/Order there).
+                var prev = i > 0 ? tokens[i - 1].ToUpperInvariant() : "";
+                var tablePosition = prev == "FROM" || prev.EndsWith("JOIN") || prev == "," || prev == ".";
+                var partialAfter = i == tokens.Count - 1 ||
+                    "BY".StartsWith(tokens[^1], StringComparison.OrdinalIgnoreCase);
+
+                if (!tablePosition && partialAfter)
+                {
+                    context.Type = SqlContextType.AfterGroupOrOrder;
+                    context.ExpectingKeyword = true;
+                    context.LastKeyword = token;
+                    break;
+                }
+            }
             else if (FromKeywords.Contains(token))
             {
-                context.Type = SqlContextType.FromClause;
-                context.ExpectingTableName = true;
+                if (token != "FROM" && token != "JOIN")
+                {
+                    // INNER/LEFT/RIGHT/FULL/CROSS — a JOIN keyword should follow, not a table
+                    context.Type = SqlContextType.AfterTableName;
+                    context.ExpectingKeyword = true;
+                    context.LastKeyword = token;
+                    break;
+                }
+
+                var afterFrom = tokens.Skip(i + 1).ToList();
+                var fromContext = AnalyzeFromClauseTokens(afterFrom, caretAtWordEnd);
+                context.Type = fromContext.Type;
+                context.ExpectingTableName = fromContext.ExpectingTableName;
+                context.ExpectingKeyword = fromContext.ExpectingKeyword;
                 context.LastKeyword = token;
                 break;
             }
@@ -372,72 +383,137 @@ public class SqlParser : ISqlParser
         return "FROM".StartsWith(token, StringComparison.OrdinalIgnoreCase) && token.Length < 4;
     }
 
-    private static bool HasFromKeyword(List<string> tokens)
+    /// <summary>
+    /// Classifies the caret position given the tokens between the last FROM/JOIN keyword and the
+    /// caret: still naming a table (FromClause), or done and expecting a keyword
+    /// (AfterTableName/AfterTableAlias — JOIN, WHERE, GROUP BY, ...).
+    /// </summary>
+    private static SqlContext AnalyzeFromClauseTokens(List<string> afterFrom, bool caretAtWordEnd)
     {
-        return tokens.Any(t => FromKeywords.Contains(t.ToUpperInvariant()));
+        var context = new SqlContext { Type = SqlContextType.FromClause, ExpectingTableName = true };
+
+        if (afterFrom.Count == 0)
+            return context;
+
+        var idx = 0;
+        var lastRefHasAlias = false;
+
+        while (idx < afterFrom.Count)
+        {
+            if (!TryParseQualifiedName(afterFrom, ref idx, out _, out _, out var endsWithDot) || endsWithDot)
+                return context; // dangling comma/dot or unparsable (e.g. subquery paren) — expect a table
+
+            lastRefHasAlias = false;
+
+            if (idx < afterFrom.Count && afterFrom[idx].Equals("AS", StringComparison.OrdinalIgnoreCase))
+            {
+                idx++;
+                if (idx >= afterFrom.Count)
+                {
+                    // "FROM t AS |" — user is about to type a new alias name; nothing useful to suggest
+                    context.Type = SqlContextType.General;
+                    context.ExpectingTableName = false;
+                    return context;
+                }
+                if (IsIdentifierToken(afterFrom[idx]))
+                {
+                    lastRefHasAlias = true;
+                    idx++;
+                }
+            }
+            else if (idx < afterFrom.Count && IsIdentifierToken(afterFrom[idx]))
+            {
+                lastRefHasAlias = true;
+                idx++;
+            }
+
+            if (idx < afterFrom.Count && afterFrom[idx] == ",")
+            {
+                idx++;
+                if (idx >= afterFrom.Count)
+                    return context; // "FROM a, |" — next table expected
+                continue;
+            }
+            break;
+        }
+
+        if (idx < afterFrom.Count)
+        {
+            // "FROM Customers c WH|" — a lone identifier being typed after table + alias is a
+            // partially typed keyword; suggest keywords and let the prefix filter narrow them.
+            if (caretAtWordEnd && idx == afterFrom.Count - 1 && lastRefHasAlias && IsIdentifierToken(afterFrom[^1]))
+            {
+                context.Type = SqlContextType.AfterTableAlias;
+                context.ExpectingTableName = false;
+                context.ExpectingKeyword = true;
+                return context;
+            }
+            return context; // unparsed remainder — fall back to table expectation
+        }
+
+        if (caretAtWordEnd)
+        {
+            // Caret still touches the last identifier. If that identifier is the table name itself,
+            // the user is typing the table; if it parsed as an "alias", it is more likely a partially
+            // typed keyword (GRO|, WH|) — suggest keywords and let the prefix filter decide.
+            if (!lastRefHasAlias)
+                return context;
+
+            context.Type = SqlContextType.AfterTableName;
+        }
+        else
+        {
+            context.Type = lastRefHasAlias ? SqlContextType.AfterTableAlias : SqlContextType.AfterTableName;
+        }
+
+        context.ExpectingTableName = false;
+        context.ExpectingKeyword = true;
+        return context;
     }
 
-    private static SqlContext AnalyzeFromContext(List<string> tokensAfterSelect)
+    /// <summary>
+    /// Parses a possibly schema-qualified identifier ("dbo.Orders", "[dbo].[Orders]") starting at
+    /// <paramref name="i"/>, advancing it past the consumed tokens. <paramref name="endsWithDot"/>
+    /// is true for a trailing dot with nothing after it ("dbo.").
+    /// </summary>
+    private static bool TryParseQualifiedName(List<string> tokens, ref int i, out string fullName, out string bareName, out bool endsWithDot)
     {
-        var context = new SqlContext();
+        fullName = string.Empty;
+        bareName = string.Empty;
+        endsWithDot = false;
 
-        for (int i = 0; i < tokensAfterSelect.Count; i++)
+        if (i >= tokens.Count || !IsIdentifierToken(tokens[i]))
+            return false;
+
+        var parts = new List<string> { CleanIdentifier(tokens[i]) };
+        i++;
+
+        while (i < tokens.Count && tokens[i] == ".")
         {
-            var token = tokensAfterSelect[i].ToUpperInvariant();
-            if (token == "FROM")
+            if (i + 1 < tokens.Count && IsIdentifierToken(tokens[i + 1]))
             {
-                var tokensAfterFrom = tokensAfterSelect.Skip(i + 1).ToList();
-
-                if (tokensAfterFrom.Count == 0)
-                {
-                    context.Type = SqlContextType.FromClause;
-                    context.ExpectingTableName = true;
-                    context.LastKeyword = "FROM";
-                }
-                else if (tokensAfterFrom.Count == 1 && IsPartialWord(tokensAfterFrom[0]))
-                {
-                    context.Type = SqlContextType.FromClause;
-                    context.ExpectingTableName = true;
-                    context.LastKeyword = "FROM";
-                }
-                else if (tokensAfterFrom.Any(t => WhereKeywords.Contains(t.ToUpperInvariant())))
-                {
-                    context.Type = SqlContextType.WhereClause;
-                    context.ExpectingColumnName = true;
-                }
-                else
-                {
-                    var lastToken = tokensAfterFrom.Last();
-                    var hasJoinKeywords = tokensAfterFrom.Any(t => FromKeywords.Contains(t.ToUpperInvariant()));
-
-                    if (tokensAfterFrom.Count >= 2 &&
-                        !IsKeyword(tokensAfterFrom[0]) &&
-                        !IsKeyword(tokensAfterFrom[1]) &&
-                        !hasJoinKeywords &&
-                        IsPartialWord(lastToken))
-                    {
-                        context.Type = SqlContextType.AfterTableAlias;
-                        context.ExpectingKeyword = true;
-                        context.LastKeyword = "FROM";
-                    }
-                    else if (!hasJoinKeywords && tokensAfterFrom.Count >= 1 &&
-                            !IsKeyword(tokensAfterFrom[0]) && IsPartialWord(lastToken))
-                    {
-                        context.Type = SqlContextType.AfterTableName;
-                        context.ExpectingKeyword = true;
-                        context.LastKeyword = "FROM";
-                    }
-                    else
-                    {
-                        context.Type = SqlContextType.FromClause;
-                        context.ExpectingTableName = true;
-                    }
-                }
+                parts.Add(CleanIdentifier(tokens[i + 1]));
+                i += 2;
+            }
+            else
+            {
+                i++;
+                endsWithDot = true;
                 break;
             }
         }
 
-        return context;
+        fullName = string.Join(".", parts);
+        bareName = parts[^1];
+        return true;
+    }
+
+    private static bool IsIdentifierToken(string token)
+    {
+        if (string.IsNullOrEmpty(token) || IsKeyword(token))
+            return false;
+        var c = token[0];
+        return char.IsLetter(c) || c == '_' || c == '[' || c == '"' || c == '`';
     }
 
     public IList<string> ExtractTableNames(string sqlText)
@@ -450,9 +526,9 @@ public class SqlParser : ISqlParser
             var token = tokens[i].ToUpperInvariant();
             if (token == "FROM" || token.EndsWith("JOIN"))
             {
-                var nextToken = tokens[i + 1];
-                if (!string.IsNullOrEmpty(nextToken) && !IsKeyword(nextToken))
-                    tableNames.Add(CleanIdentifier(nextToken));
+                var j = i + 1;
+                if (TryParseQualifiedName(tokens, ref j, out var fullName, out _, out var endsWithDot) && !endsWithDot)
+                    tableNames.Add(fullName);
             }
         }
 
@@ -473,53 +549,48 @@ public class SqlParser : ISqlParser
         {
             var token = tokens[i].ToUpperInvariant();
 
-            if (token == "FROM" || token.EndsWith("JOIN"))
+            if (token != "FROM" && !token.EndsWith("JOIN"))
+                continue;
+
+            var j = i + 1;
+            while (true)
             {
-                if (i + 1 < tokens.Count)
+                if (!TryParseQualifiedName(tokens, ref j, out var fullName, out var bareName, out var endsWithDot) || endsWithDot)
+                    break;
+
+                string? alias = null;
+                if (j < tokens.Count && tokens[j].Equals("AS", StringComparison.OrdinalIgnoreCase))
                 {
-                    var tableName = CleanIdentifier(tokens[i + 1]);
-
-                    bool hasAlias = false;
-                    if (i + 2 < tokens.Count)
+                    if (j + 1 < tokens.Count && IsIdentifierToken(tokens[j + 1]))
                     {
-                        var potentialAlias = tokens[i + 2];
-
-                        if (potentialAlias.Equals("AS", StringComparison.OrdinalIgnoreCase))
-                        {
-                            if (i + 3 < tokens.Count)
-                            {
-                                var alias = CleanIdentifier(tokens[i + 3]);
-                                if (!IsKeyword(alias))
-                                {
-                                    aliases[alias] = tableName;
-                                    hasAlias = true;
-                                }
-                            }
-                        }
-                        else if (!IsKeyword(potentialAlias) &&
-                                !potentialAlias.Equals(",", StringComparison.OrdinalIgnoreCase) &&
-                                !potentialAlias.Equals("(", StringComparison.OrdinalIgnoreCase) &&
-                                !potentialAlias.Equals(")", StringComparison.OrdinalIgnoreCase) &&
-                                !potentialAlias.Equals("WHERE", StringComparison.OrdinalIgnoreCase) &&
-                                !potentialAlias.Equals("ORDER", StringComparison.OrdinalIgnoreCase) &&
-                                !potentialAlias.Equals("GROUP", StringComparison.OrdinalIgnoreCase) &&
-                                !potentialAlias.Equals("HAVING", StringComparison.OrdinalIgnoreCase) &&
-                                !potentialAlias.Equals("LIMIT", StringComparison.OrdinalIgnoreCase) &&
-                                !potentialAlias.Equals("INNER", StringComparison.OrdinalIgnoreCase) &&
-                                !potentialAlias.Equals("LEFT", StringComparison.OrdinalIgnoreCase) &&
-                                !potentialAlias.Equals("RIGHT", StringComparison.OrdinalIgnoreCase) &&
-                                !potentialAlias.Equals("FULL", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var alias = CleanIdentifier(potentialAlias);
-                            aliases[alias] = tableName;
-                            hasAlias = true;
-                        }
+                        alias = CleanIdentifier(tokens[j + 1]);
+                        j += 2;
                     }
-
-                    if (!hasAlias && !aliases.ContainsKey(tableName))
-                        aliases[tableName] = tableName;
+                    else
+                    {
+                        j++;
+                    }
                 }
+                else if (j < tokens.Count && IsIdentifierToken(tokens[j]))
+                {
+                    alias = CleanIdentifier(tokens[j]);
+                    j++;
+                }
+
+                var key = alias ?? bareName;
+                if (!aliases.ContainsKey(key))
+                    aliases[key] = fullName;
+
+                // "FROM a, b c, d" — keep consuming comma-separated table refs
+                if (j < tokens.Count && tokens[j] == ",")
+                {
+                    j++;
+                    continue;
+                }
+                break;
             }
+
+            i = j - 1;
         }
 
         return aliases;

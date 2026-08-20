@@ -47,6 +47,7 @@ public class SqlCompletionData : ICompletionData
             CompletionType.Table => ("T", "TableColor"),
             CompletionType.Column => ("C", "ColumnColor"),
             CompletionType.Alias => ("A", "AliasColor"),
+            CompletionType.Schema => ("S", "SchemaColor"),
             _ => ("?", "CompletionText")
         };
 

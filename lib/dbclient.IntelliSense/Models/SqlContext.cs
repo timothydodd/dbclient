@@ -26,7 +26,8 @@ public enum SqlContextType
     UpdateTable,
     ColumnAfterDot,
     AfterTableName,
-    AfterTableAlias
+    AfterTableAlias,
+    AfterGroupOrOrder
 }
 
 public enum CompletionContext
@@ -43,5 +44,6 @@ public enum CompletionType
     Keyword,
     Table,
     Column,
-    Alias
+    Alias,
+    Schema
 }
