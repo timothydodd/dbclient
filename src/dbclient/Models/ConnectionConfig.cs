@@ -28,6 +28,14 @@ public class ConnectionConfig
     public string SshPassword { get; set; } = "";
     public int SshRemotePort { get; set; }
     public string SshKeyFile { get; set; } = "";
+    /// <summary>Passphrase for an encrypted SSH private key. Stored encrypted (same as Password).</summary>
+    public string SshKeyPassphrase { get; set; } = "";
+
+    // SQL Server TLS
+    /// <summary>Encrypt the SQL Server connection (Encrypt=True). Default on.</summary>
+    public bool Encrypt { get; set; } = true;
+    /// <summary>Trust the server certificate without validation — only for self-signed dev servers.</summary>
+    public bool TrustServerCertificate { get; set; } = false;
 
     public override string ToString() =>
         !string.IsNullOrEmpty(DisplayName) ? DisplayName

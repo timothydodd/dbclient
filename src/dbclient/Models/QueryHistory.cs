@@ -13,19 +13,21 @@ public class QueryHistoryEntry
 
 public class QueryHistoryService
 {
-    private static readonly string HistoryFile = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".dbclient", "history.json");
+    private static readonly string HistoryFile = Services.AppPaths.HistoryFile;
+    private static readonly object FileLock = new();
     private const int MaxEntries = 100;
 
     public List<QueryHistoryEntry> Load()
     {
         try
         {
-            if (File.Exists(HistoryFile))
+            lock (FileLock)
             {
-                var json = File.ReadAllText(HistoryFile);
-                return JsonSerializer.Deserialize<List<QueryHistoryEntry>>(json) ?? [];
+                if (File.Exists(HistoryFile))
+                {
+                    var json = File.ReadAllText(HistoryFile);
+                    return JsonSerializer.Deserialize<List<QueryHistoryEntry>>(json) ?? [];
+                }
             }
         }
         catch (Exception ex) { Services.AppLogger.Error("Failed to load query history", ex); }
@@ -53,23 +55,23 @@ public class QueryHistoryService
 
     public void Add(QueryHistoryEntry entry)
     {
-        var history = Load();
-        history.Insert(0, entry);
-        if (history.Count > MaxEntries)
-            history.RemoveRange(MaxEntries, history.Count - MaxEntries);
-        Save(history);
+        // Read-modify-write under a process-wide lock so concurrent adds never drop entries.
+        lock (FileLock)
+        {
+            var history = Load();
+            history.Insert(0, entry);
+            if (history.Count > MaxEntries)
+                history.RemoveRange(MaxEntries, history.Count - MaxEntries);
+            Save(history);
+        }
     }
 
     private static void Save(List<QueryHistoryEntry> history)
     {
         try
         {
-            var dir = Path.GetDirectoryName(HistoryFile);
-            if (dir != null && !Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-
             var json = JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(HistoryFile, json);
+            Services.AppPaths.WriteTextAtomic(HistoryFile, json);
         }
         catch (Exception ex) { Services.AppLogger.Error("Failed to save query history", ex); }
     }

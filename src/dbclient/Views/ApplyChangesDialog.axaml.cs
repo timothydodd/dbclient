@@ -9,12 +9,22 @@ public partial class ApplyChangesDialog : Window
     public bool ShouldExecute { get; private set; }
     public string SqlText => SqlTextBox.Text ?? "";
 
-    public ApplyChangesDialog() : this("") { }
+    private readonly string _generatedSql;
 
-    public ApplyChangesDialog(string sql)
+    /// <summary>True when the user changed the generated script before executing.</summary>
+    public bool WasEdited => !string.Equals(SqlText, _generatedSql, StringComparison.Ordinal);
+
+    public ApplyChangesDialog() : this("", 0) { }
+
+    public ApplyChangesDialog(string sql, int expectedStatements)
     {
         InitializeComponent();
+        _generatedSql = sql;
         SqlTextBox.Text = sql;
+        ExpectedText.Text = expectedStatements > 0
+            ? $"{expectedStatements} UPDATE statement(s), each expected to affect exactly 1 row."
+            : "";
+        SqlTextBox.TextChanged += (_, _) => EditedWarning.IsVisible = WasEdited;
     }
 
     private void TitleBar_PointerPressed(object? sender, PointerPressedEventArgs e)

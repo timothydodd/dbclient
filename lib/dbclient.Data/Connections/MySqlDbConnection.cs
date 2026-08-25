@@ -1,6 +1,6 @@
 using System.Data;
 using Dapper;
-using MySql.Data.MySqlClient;
+using MySqlConnector;
 using dbclient.Data.Models;
 
 namespace dbclient.Data.Connections;
@@ -10,12 +10,41 @@ public class MySqlDbConnection : ConnectionBase
     public override string Name => $"MySQL:{Address}";
     public override string ConnectionType => "MySQL";
 
+    private string? _lastConnectionString;
+
     public override async Task<IDbConnection> GetConnectionAsync(string database, CancellationToken ct = default)
     {
-        EnsureSshTunnel();
-        var con = new MySqlConnection(BuildConnectionString(database));
-        await con.OpenAsync(ct);
+        await EnsureSshTunnelAsync(ct);
+        var cs = BuildConnectionString(database);
+        _lastConnectionString = cs;
+        var con = new MySqlConnection(cs);
+        try
+        {
+            await con.OpenAsync(ct);
+        }
+        catch
+        {
+            await con.DisposeAsync();
+            throw;
+        }
         return con;
+    }
+
+    protected override IDisposable? SubscribeInfoMessages(IDbConnection con, List<string> sink)
+    {
+        if (con is not MySqlConnection my) return null;
+        void Handler(object sender, MySqlInfoMessageEventArgs e)
+        {
+            foreach (var err in e.Errors)
+                sink.Add(string.IsNullOrEmpty(err.Level) ? err.Message : $"{err.Level} {err.ErrorCode}: {err.Message}");
+        }
+        my.InfoMessage += Handler;
+        return new Unsubscriber(() => my.InfoMessage -= Handler);
+    }
+
+    private sealed class Unsubscriber(Action dispose) : IDisposable
+    {
+        public void Dispose() => dispose();
     }
 
     public override async Task<DbMaster> LoadDatabasesAsync(CancellationToken ct = default)
@@ -25,7 +54,7 @@ public class MySqlDbConnection : ConnectionBase
             { "mysql", "sys", "performance_schema", "information_schema" };
 
         using var con = await GetConnectionAsync("information_schema", ct);
-        var databases = await con.QueryAsync<string>("SHOW DATABASES;");
+        var databases = await con.QueryAsync<string>(Command("SHOW DATABASES;", ct: ct));
         foreach (var db in databases)
         {
             if (!excludeSet.Contains(db))
@@ -40,7 +69,7 @@ public class MySqlDbConnection : ConnectionBase
         var database = new DbDatabase { Name = databaseName };
 
         // Load tables, views, and columns via INFORMATION_SCHEMA
-        var columnsQuery = $@"
+        var columnsQuery = @"
             SELECT CASE WHEN b.TABLE_NAME IS NOT NULL THEN 'view' ELSE 'table' END OBJECT_TYPE, a.*
             FROM INFORMATION_SCHEMA.COLUMNS a
             LEFT OUTER JOIN INFORMATION_SCHEMA.VIEWS b
@@ -50,7 +79,7 @@ public class MySqlDbConnection : ConnectionBase
 
         using (var con = await GetConnectionAsync("information_schema", ct))
         {
-            var rows = await con.QueryAsync(columnsQuery, new { Schema = databaseName });
+            var rows = await con.QueryAsync(Command(columnsQuery, new { Schema = databaseName }, ct));
             string? currentTable = null;
             List<DbColumn>? currentColumns = null;
 
@@ -61,9 +90,9 @@ public class MySqlDbConnection : ConnectionBase
                 string dataType = row.DATA_TYPE;
                 string objectType = row.OBJECT_TYPE;
                 string isNullable = row.IS_NULLABLE;
-                // CHARACTER_MAXIMUM_LENGTH is bigint unsigned in information_schema, which
-                // MySql.Data returns as ulong; a dynamic ulong->long? assignment throws
-                // (no implicit conversion), so read it as object and convert safely.
+                // CHARACTER_MAXIMUM_LENGTH is bigint unsigned in information_schema and comes
+                // back as ulong; a dynamic ulong->long? assignment throws (no implicit
+                // conversion), so read it as object and convert safely.
                 object? maxLengthObj = row.CHARACTER_MAXIMUM_LENGTH;
                 string? maxLength = maxLengthObj?.ToString();
 
@@ -98,7 +127,8 @@ public class MySqlDbConnection : ConnectionBase
         {
             foreach (var table in database.Tables)
             {
-                var pkSql = $"SHOW KEYS FROM `{table.Name}` WHERE Key_name = 'PRIMARY';";
+                ct.ThrowIfCancellationRequested();
+                var pkSql = $"SHOW KEYS FROM {SqlIdentifier.Quote(SqlDialect.MySql, table.Name)} WHERE Key_name = 'PRIMARY';";
                 try
                 {
                     await ReadDataAsync(con, pkSql, reader =>
@@ -107,7 +137,11 @@ public class MySqlDbConnection : ConnectionBase
                         var col = table.Columns.FirstOrDefault(c =>
                             c.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase));
                         if (col != null) col.IsPrimaryKey = true;
-                    });
+                    }, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -123,13 +157,35 @@ public class MySqlDbConnection : ConnectionBase
 
     private string BuildConnectionString(string database)
     {
-        var portPart = "";
-        if (UseSSH)
-            portPart = $"Port={EstablishedSshPort};";
-        else if (!string.IsNullOrWhiteSpace(Port))
-            portPart = $"Port={Port};";
+        var b = new MySqlConnectionStringBuilder
+        {
+            Server = UseSSH ? "127.0.0.1" : Address,
+            Database = database,
+            UserID = User,
+            Password = Password,
+            ConnectionTimeout = (uint)ConnectionTimeout,
+            DefaultCommandTimeout = (uint)CommandTimeout,
+            GuidFormat = MySqlGuidFormat.LittleEndianBinary16, // equivalent of MySql.Data "old guids=true"
+            ConvertZeroDateTime = true,
+            CharacterSet = "utf8mb4",
+            AllowUserVariables = true,
+            UseXaTransactions = false
+        };
 
-        return $"Server={Address};{portPart}Database={database};Uid={User};Pwd={Password};" +
-               $"Connection Timeout={ConnectionTimeout};old guids=true;Convert Zero Datetime=True;CharSet=utf8;";
+        if (UseSSH)
+            b.Port = (uint)EstablishedSshPort;
+        else if (uint.TryParse(Port, out var port) && port > 0)
+            b.Port = port;
+
+        return b.ConnectionString;
+    }
+
+    public override ValueTask DisposeAsync()
+    {
+        if (_lastConnectionString != null)
+        {
+            try { using var c = new MySqlConnection(_lastConnectionString); MySqlConnection.ClearPool(c); } catch { /* best effort */ }
+        }
+        return base.DisposeAsync();
     }
 }

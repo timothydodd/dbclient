@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build & test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Test
+        run: dotnet test --no-build -c Release
+
+      - name: Check for vulnerable packages
+        shell: bash
+        run: |
+          output=$(dotnet list dbclient.slnx package --vulnerable --include-transitive 2>&1)
+          echo "$output"
+          if echo "$output" | grep -q "has the following vulnerable packages"; then
+            echo "::error::Vulnerable packages detected"
+            exit 1
+          fi

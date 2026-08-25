@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=dbclient
+GenericName=SQL Client
+Comment=Cross-platform SQL client for SQL Server, MySQL and SQLite
+Exec=dbclient
+Icon=dbclient
+Terminal=false
+Categories=Development;Database;
+Keywords=sql;database;query;mysql;sqlite;sqlserver;
+StartupWMClass=dbclient

@@ -4,6 +4,8 @@ A modern, cross-platform SQL client built with Avalonia UI and .NET 10. Connect 
 
 > Ported and modernised from the CSVQuery WPF project.
 
+![dbclient screenshot](screenshot.png)
+
 ---
 
 ## Features
@@ -23,7 +25,7 @@ A modern, cross-platform SQL client built with Avalonia UI and .NET 10. Connect 
 - **Two-level tabs** — top strip for database connections (color-coded by name hash), inner strip for query tabs.
 - **Per-database query tabs** — each database in a connection keeps its own group of query tabs. Switching databases swaps the tab strip; queries written before connecting migrate into the first database automatically.
 - **Drag-to-reorder tabs**, inline rename (double-click), close-others / close-to-right / close-to-left from the context menu.
-- **Persistent state** — open connections, active database, query text, cursor position, panel layout, and theme are saved per connection under `~/.dbclient/` and restored on launch.
+- **Persistent state** — open connections, active database, query text, panel layout, and theme are saved per connection under `~/.dbclient/` and restored on launch.
 - **Saved connections sidebar** with edit / delete and a quick-open list.
 - **Connection error overlay** with a Retry button when a connection drops or fails to authenticate.
 
@@ -42,7 +44,7 @@ A modern, cross-platform SQL client built with Avalonia UI and .NET 10. Connect 
 - Databases, schemas, tables, views, stored procedures, columns (with type, PK and nullability hints).
 - **Always-visible filter bar** with `Tables` / `Columns` scope toggles.
   - Filter syntax: spaces are AND, `|` is OR. `customer order|client name` ⇒ `(customer AND order) OR (client AND name)`.
-  - Ctrl+F focuses the filter, Esc clears it and returns focus to the tree.
+  - Ctrl+Shift+E (or Ctrl+F while the tree has focus) focuses the filter, Esc clears it and returns focus to the tree.
 - **Right-click on a table** for `SELECT *`, `SELECT TOP/LIMIT 100`, `SELECT COUNT(*)`, `INSERT INTO`, `UPDATE`, `DELETE FROM`, `CREATE TABLE` / `DROP TABLE` scripts. Quoting is dialect-aware (`[name]` / `` `name` `` / `"name"`).
 - **Right-click on a view / stored procedure** for `SELECT *` / `EXEC` / `CALL` templates.
 - **Double-click a table or view** to insert `SELECT * FROM …` into the active query tab.
@@ -52,9 +54,10 @@ A modern, cross-platform SQL client built with Avalonia UI and .NET 10. Connect 
 
 - **Editable grid** — edit cells inline, then preview and apply a generated `UPDATE` statement back to the database. Primary keys are auto-detected.
 - **Multi-result-set support** — `SELECT` queries returning multiple result sets are tabbed.
-- **In-grid search** — Ctrl+F filters rows.
+- **In-grid search** — Ctrl+Shift+R (or Ctrl+F while the grid has focus) filters rows. `NULL` is rendered distinctly from empty strings.
 - **Sortable columns** with stable reset.
-- **Copy** cell, copy with headers, copy all, **export to CSV**.
+- **Copy** cell, copy with headers, copy all, **copy as INSERT**, **export to CSV / JSON**.
+- **Row limit** (Query → Row limit) with a visible banner when a result is truncated; server messages (`PRINT`, warnings) shown in a Messages pane.
 - **Affected-row counts**, error messages with line numbers and SQL Server error codes, execution time in the status bar.
 
 ### Query History
@@ -74,7 +77,7 @@ Three built-in themes that swap at runtime — **Dark** (default), **Light**, **
 Requires the **.NET 10 SDK**.
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/timothydodd/dbclient.git
 cd dbclient
 dotnet build
 dotnet run --project src/dbclient/dbclient.csproj
@@ -89,6 +92,18 @@ dotnet build src/dbclient/
 ```
 
 > On WSL builds against `/mnt/f`, an `MSB3021` file-lock error means an instance of the app is still running. Close it (or build from a Windows terminal) and retry.
+
+Log file: `~/.dbclient/log.txt`.
+
+### Publishing
+
+Self-contained, single-file builds (not trimmed) for each platform are described by the publish profiles in `src/dbclient/Properties/PublishProfiles/`:
+
+```bash
+dotnet publish src/dbclient/dbclient.csproj -p:PublishProfile=win-x64     # also: linux-x64, osx-x64, osx-arm64
+```
+
+Output lands in `src/dbclient/bin/publish/<rid>/`. On macOS, `assets/macos/make-bundle.sh <publish-dir>` wraps the output in a `dbclient.app`; `assets/dbclient.desktop` is a launcher entry for Linux. Pushing a `v*` tag runs `.github/workflows/release.yml`, which publishes all four RIDs and attaches the archives to a GitHub Release (unsigned).
 
 ### Azure SQL setup
 
@@ -107,17 +122,28 @@ Then in the New Connection dialog, pick **SQL Server**, set the server (e.g. `my
 
 | Shortcut | Action |
 |---|---|
-| F5 / Ctrl+Enter | Execute current query (or selection) |
-| Esc | Cancel running query / clear schema-tree filter |
 | Ctrl+N | New query tab |
-| Ctrl+W | Close query tab |
-| Ctrl+S | Save state |
-| Ctrl+Shift+F | Format current query |
+| Ctrl+W | Close query tab (prompts if unsaved) |
+| Ctrl+Tab / Ctrl+Shift+Tab | Next / previous query tab |
+| Ctrl+O | Open .sql file |
+| Ctrl+S | Save .sql file (Save As when tab has no file) |
+| Ctrl+Shift+S | Save .sql file as… |
+| F5 / Ctrl+Enter | Execute query (selection or whole editor) |
+| Esc | Cancel running query |
+| Ctrl+E | Explain query plan |
+| Ctrl+Shift+F | Format SQL |
+| Ctrl+/ | Toggle line comment (`-- `) |
+| Ctrl+F | Find in focused pane (editor / results / schema tree) |
+| Ctrl+= / Ctrl+- / Ctrl+0 | Editor zoom in / out / reset |
+| Alt+Z | Toggle word wrap |
+| Ctrl+Shift+E | Focus schema tree filter |
+| Ctrl+Shift+R | Toggle results filter |
 | Ctrl+L | Toggle connection panel |
 | Ctrl+H | Toggle history panel |
-| Ctrl+F | Focus schema-tree filter (or results search when focus is in results) |
+| Ctrl+T | Cycle theme |
+| F1 | Keyboard shortcuts |
 
-Explain query and Cycle theme are available from the menus (Query → Explain, View → Theme).
+Workspace state (open tabs, connections, window layout) autosaves a few seconds after each edit, on execute, and on exit; **File → Save Workspace** forces it.
 
 ---
 
@@ -137,13 +163,19 @@ See [`CLAUDE.md`](./CLAUDE.md) for an in-depth architecture guide.
 ## Tech Stack
 
 - **.NET 10.0**
-- **Avalonia UI 11.3** + **AvaloniaEdit 11.4** for the editor and tabs
-- **Avalonia.Controls.DataGrid** for the results grid
+- **Avalonia UI 12.1** + **AvaloniaEdit 12.0** for the editor and tabs
+- **Avalonia.Controls.DataGrid 12.1** for the results grid
 - **Dapper** for query execution
-- **Microsoft.Data.SqlClient** (with `Active Directory Default` for Azure), **MySql.Data**, **System.Data.SQLite.Core**
+- **Microsoft.Data.SqlClient** (with `Active Directory Default` for Azure), **MySqlConnector**, **Microsoft.Data.Sqlite**
 - **Azure.Identity** (`DefaultAzureCredential`) for passwordless Azure SQL
 - **SSH.NET** for SSH tunnels
 - **System.Text.Json** for state serialization
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE). Third-party components and their licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ---
 

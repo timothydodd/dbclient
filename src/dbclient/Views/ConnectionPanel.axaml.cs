@@ -7,7 +7,9 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.VisualTree;
+using dbclient.Data;
 using dbclient.Models;
+using dbclient.Services;
 using dbclient.ViewModels;
 
 namespace dbclient.Views;
@@ -66,13 +68,21 @@ public partial class ConnectionPanel : UserControl
 
     private void OnPanelKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
     {
-        if (e.Key == Avalonia.Input.Key.F && e.KeyModifiers == Avalonia.Input.KeyModifiers.Control)
+        // Ctrl+Shift+E focuses the schema-tree filter (Ctrl+F is left for the editor's search panel).
+        if (e.Key == Avalonia.Input.Key.E
+            && e.KeyModifiers == (Avalonia.Input.KeyModifiers.Control | Avalonia.Input.KeyModifiers.Shift))
         {
-            var box = this.FindControl<TextBox>("FilterBox");
-            box?.Focus();
-            box?.SelectAll();
+            FocusFilter();
             e.Handled = true;
         }
+    }
+
+    /// <summary>Focuses the schema-tree filter box (bound to Ctrl+Shift+E by the main window / panel).</summary>
+    public void FocusFilter()
+    {
+        var box = this.FindControl<TextBox>("FilterBox");
+        box?.Focus();
+        box?.SelectAll();
     }
 
     private void ApplyFilterFromBox(string? text)
@@ -228,8 +238,12 @@ public partial class ConnectionPanel : UserControl
 
     private async void RetryConnection_Click(object? sender, RoutedEventArgs e)
     {
-        if (_errorBoundTab != null)
-            await _errorBoundTab.ConnectAsync();
+        try
+        {
+            if (_errorBoundTab != null)
+                await _errorBoundTab.ConnectAsync();
+        }
+        catch (Exception ex) { AppLogger.Error("Retry connection failed", ex); }
     }
 
     private void OnTreeCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
@@ -309,8 +323,12 @@ public partial class ConnectionPanel : UserControl
 
     private async void RefreshSchema_Click(object? sender, RoutedEventArgs e)
     {
-        if (_vm?.SelectedConnectionTab is { } connTab && !string.IsNullOrEmpty(connTab.ActiveDatabase))
-            await connTab.SwitchDatabaseAsync(connTab.ActiveDatabase, force: true);
+        try
+        {
+            if (_vm?.SelectedConnectionTab is { } connTab && !string.IsNullOrEmpty(connTab.ActiveDatabase))
+                await connTab.SwitchDatabaseAsync(connTab.ActiveDatabase, force: true);
+        }
+        catch (Exception ex) { AppLogger.Error("Refresh schema failed", ex); }
     }
 
     private void ToggleConnectionsOverlay_Click(object? sender, RoutedEventArgs e)
@@ -322,35 +340,43 @@ public partial class ConnectionPanel : UserControl
 
     private async void NewConnection_Click(object? sender, RoutedEventArgs e)
     {
-        var window = this.FindAncestorOfType<Window>();
-        if (window == null || _vm == null) return;
-
-        var dialog = new ConnectionDialog();
-        await dialog.ShowDialog(window);
-
-        if (dialog.Result != null)
+        try
         {
-            await _vm.OpenConnectionTabAsync(dialog.Result);
-            var overlay = this.FindControl<Border>("ConnectionsOverlay");
-            if (overlay != null) overlay.IsVisible = false;
+            var window = this.FindAncestorOfType<Window>();
+            if (window == null || _vm == null) return;
+
+            var dialog = new ConnectionDialog();
+            await dialog.ShowDialog(window);
+
+            if (dialog.Result != null)
+            {
+                await _vm.OpenConnectionTabAsync(dialog.Result);
+                var overlay = this.FindControl<Border>("ConnectionsOverlay");
+                if (overlay != null) overlay.IsVisible = false;
+            }
         }
+        catch (Exception ex) { AppLogger.Error("New connection failed", ex); }
     }
 
     private async void SchemaTree_KeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
     {
-        if (e.Key == Avalonia.Input.Key.C && e.KeyModifiers == Avalonia.Input.KeyModifiers.Control)
+        try
         {
-            var tree = this.FindControl<TreeView>("SchemaTree");
-            if (tree?.SelectedItem is ConnectionTreeNode node)
+            if (e.Key == Avalonia.Input.Key.C && e.KeyModifiers == Avalonia.Input.KeyModifiers.Control)
             {
-                var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-                if (clipboard != null)
+                var tree = this.FindControl<TreeView>("SchemaTree");
+                if (tree?.SelectedItem is ConnectionTreeNode node)
                 {
-                    await clipboard.SetTextAsync(node.Name);
-                    e.Handled = true;
+                    var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+                    if (clipboard != null)
+                    {
+                        e.Handled = true;
+                        await clipboard.SetTextAsync(node.Name);
+                    }
                 }
             }
         }
+        catch (Exception ex) { AppLogger.Error("SchemaTree_KeyDown failed", ex); }
     }
 
     private void TreeItem_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
@@ -363,12 +389,8 @@ public partial class ConnectionPanel : UserControl
         var connTab = _vm.SelectedConnectionTab;
         var menu = new ContextMenu();
 
-        string QuoteName(string name) => connTab.Config.Type switch
-        {
-            ConnectionType.MySql => $"`{name}`",
-            ConnectionType.Sqlite => $"\"{name}\"",
-            _ => $"[{name}]"
-        };
+        var dialect = UpdateSqlGenerator.DialectFor(connTab.Config.Type);
+        string QuoteName(string name) => SqlIdentifier.Quote(dialect, name);
 
         string QualifiedName(ConnectionTreeNode n)
         {
@@ -388,15 +410,24 @@ public partial class ConnectionPanel : UserControl
 
         async void CopyToClipboard(string text)
         {
-            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-            if (clipboard != null) await clipboard.SetTextAsync(text);
+            try
+            {
+                var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+                if (clipboard != null) await clipboard.SetTextAsync(text);
+            }
+            catch (Exception ex) { AppLogger.Error("Copy to clipboard failed", ex); }
+        }
+
+        async void SwitchDatabase(string database, bool force = false)
+        {
+            try { await connTab.SwitchDatabaseAsync(database, force); }
+            catch (Exception ex) { AppLogger.Error($"Switch database to {database} failed", ex); }
         }
 
         switch (node.NodeType)
         {
             case ConnectionTreeNodeType.Database:
-                AddMenuItem("Switch to Database", async () =>
-                    await connTab.SwitchDatabaseAsync(node.Name));
+                AddMenuItem("Switch to Database", () => SwitchDatabase(node.Name));
                 menu.Items.Add(new Separator());
                 AddMenuItem("Copy Name", () => CopyToClipboard(node.Name));
                 break;
@@ -452,8 +483,7 @@ public partial class ConnectionPanel : UserControl
                 break;
 
             case ConnectionTreeNodeType.Folder:
-                AddMenuItem("Refresh", async () =>
-                    await connTab.SwitchDatabaseAsync(connTab.ActiveDatabase, force: true));
+                AddMenuItem("Refresh", () => SwitchDatabase(connTab.ActiveDatabase, force: true));
                 break;
         }
 
@@ -472,12 +502,8 @@ public partial class ConnectionPanel : UserControl
         if (node.NodeType is not (ConnectionTreeNodeType.Table or ConnectionTreeNodeType.View)) return;
 
         var connTab = _vm.SelectedConnectionTab;
-        string QuoteName(string name) => connTab.Config.Type switch
-        {
-            ConnectionType.MySql => $"`{name}`",
-            ConnectionType.Sqlite => $"\"{name}\"",
-            _ => $"[{name}]"
-        };
+        var dialect = UpdateSqlGenerator.DialectFor(connTab.Config.Type);
+        string QuoteName(string name) => SqlIdentifier.Quote(dialect, name);
         var quoted = !string.IsNullOrEmpty(node.SchemaName)
             ? $"{QuoteName(node.SchemaName)}.{QuoteName(node.Name)}"
             : QuoteName(node.Name);
@@ -515,12 +541,8 @@ public partial class ConnectionPanel : UserControl
 
     private static string ScriptCreateTable(ConnectionTreeNode tableNode, ConnectionTabViewModel connTab)
     {
-        string QuoteName(string n) => connTab.Config.Type switch
-        {
-            ConnectionType.MySql => $"`{n}`",
-            ConnectionType.Sqlite => $"\"{n}\"",
-            _ => $"[{n}]"
-        };
+        var dialect = UpdateSqlGenerator.DialectFor(connTab.Config.Type);
+        string QuoteName(string n) => SqlIdentifier.Quote(dialect, n);
 
         var sb = new StringBuilder();
         var tableName = !string.IsNullOrEmpty(tableNode.SchemaName)
@@ -534,10 +556,9 @@ public partial class ConnectionPanel : UserControl
         for (int i = 0; i < columns.Count; i++)
         {
             var col = columns[i];
-            var detail = col.Detail ?? "";
-            var isPk = detail.Contains(" PK");
-            var isNullable = detail.Contains(" NULL") && !isPk;
-            var dataType = detail.Replace(" PK", "").Replace(" NULL", "").Trim();
+            var isPk = col.IsPrimaryKey;
+            var isNullable = col.IsNullable && !isPk;
+            var dataType = col.DataType;
 
             if (isPk) pkColumns.Add(col.Name);
 
@@ -556,46 +577,58 @@ public partial class ConnectionPanel : UserControl
 
     private async void SchemaTree_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (sender is TreeView tree && tree.SelectedItem is ConnectionTreeNode node
-            && node.NodeType == ConnectionTreeNodeType.Database
-            && _vm?.SelectedConnectionTab != null
-            && node.Name != _vm.SelectedConnectionTab.ActiveDatabase)
+        try
         {
-            await _vm.SelectedConnectionTab.SwitchDatabaseAsync(node.Name);
+            if (sender is TreeView tree && tree.SelectedItem is ConnectionTreeNode node
+                && node.NodeType == ConnectionTreeNodeType.Database
+                && _vm?.SelectedConnectionTab != null
+                && node.Name != _vm.SelectedConnectionTab.ActiveDatabase)
+            {
+                await _vm.SelectedConnectionTab.SwitchDatabaseAsync(node.Name);
+            }
         }
+        catch (Exception ex) { AppLogger.Error("Switch database from tree failed", ex); }
     }
 
     private async void SavedConnection_Click(object? sender, RoutedEventArgs e)
     {
-        var config = (sender as Button)?.Tag as ConnectionConfig;
-        if (config != null && _vm != null)
+        try
         {
-            await _vm.OpenConnectionTabAsync(config);
-            var overlay = this.FindControl<Border>("ConnectionsOverlay");
-            if (overlay != null) overlay.IsVisible = false;
+            var config = (sender as Button)?.Tag as ConnectionConfig;
+            if (config != null && _vm != null)
+            {
+                await _vm.OpenConnectionTabAsync(config);
+                var overlay = this.FindControl<Border>("ConnectionsOverlay");
+                if (overlay != null) overlay.IsVisible = false;
+            }
         }
+        catch (Exception ex) { AppLogger.Error("Open saved connection failed", ex); }
     }
 
     private async void EditConnection_Click(object? sender, RoutedEventArgs e)
     {
-        var config = (sender as MenuItem)?.Tag as ConnectionConfig;
-        if (config == null || _vm == null) return;
-
-        var window = this.FindAncestorOfType<Window>();
-        if (window == null) return;
-
-        var dialog = new ConnectionDialog();
-        dialog.LoadExisting(config);
-        await dialog.ShowDialog(window);
-
-        if (dialog.Result != null)
+        try
         {
-            dialog.Result.Id = config.Id;
-            var index = _vm.SavedConnections.IndexOf(config);
-            if (index >= 0)
-                _vm.SavedConnections[index] = dialog.Result;
-            _vm.SaveState();
+            var config = (sender as MenuItem)?.Tag as ConnectionConfig;
+            if (config == null || _vm == null) return;
+
+            var window = this.FindAncestorOfType<Window>();
+            if (window == null) return;
+
+            var dialog = new ConnectionDialog();
+            dialog.LoadExisting(config);
+            await dialog.ShowDialog(window);
+
+            if (dialog.Result != null)
+            {
+                dialog.Result.Id = config.Id;
+                var index = _vm.SavedConnections.IndexOf(config);
+                if (index >= 0)
+                    _vm.SavedConnections[index] = dialog.Result;
+                _vm.SaveState();
+            }
         }
+        catch (Exception ex) { AppLogger.Error("Edit connection failed", ex); }
     }
 
     private void DeleteConnection_Click(object? sender, RoutedEventArgs e)

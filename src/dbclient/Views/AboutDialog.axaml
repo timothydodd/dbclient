@@ -1,0 +1,155 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="dbclient.Views.AboutDialog"
+        Title="About dbclient"
+        Width="520"
+        Height="520"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        CanResize="True"
+        MinWidth="420"
+        MinHeight="360"
+        SystemDecorations="BorderOnly"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="32">
+
+    <DockPanel>
+        <!-- Title Bar -->
+        <Border DockPanel.Dock="Top"
+                Background="{DynamicResource TitleBarBackground}"
+                Height="32"
+                PointerPressed="TitleBar_PointerPressed">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock x:Name="TitleText"
+                           Text="About dbclient"
+                           Foreground="{DynamicResource TitleBarForeground}"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Margin="12,0"/>
+                <Button Grid.Column="1"
+                        Click="Close_Click"
+                        Width="46" Height="32"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Classes="close">
+                    <Path Data="M18 6 6 18M6 6l12 12"
+                          Stroke="{DynamicResource TitleBarForeground}"
+                          StrokeThickness="1.5"
+                          StrokeLineCap="Round"
+                          Stretch="Uniform"
+                          Width="12" Height="12"/>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Buttons -->
+        <Border DockPanel.Dock="Bottom"
+                Background="{DynamicResource TitleBarBackground}"
+                Padding="12,8">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+                    <Button Content="Close" Click="Close_Click" MinWidth="80" Classes="primary" IsDefault="True" IsCancel="True"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Open log folder" Click="OpenLogFolder_Click"/>
+                    <Button Content="Copy info" Click="CopyInfo_Click"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Page switcher (About / Shortcuts) -->
+        <Border DockPanel.Dock="Top" Padding="16,10,16,0">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <Button x:Name="AboutPageButton" Content="About" Click="ShowAbout_Click" Classes="page"/>
+                <Button x:Name="ShortcutsPageButton" Content="Keyboard Shortcuts" Click="ShowShortcuts_Click" Classes="page"/>
+            </StackPanel>
+        </Border>
+
+        <Panel>
+            <!-- About page -->
+            <ScrollViewer x:Name="AboutPage" Padding="16,12">
+                <StackPanel Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Image Source="avares://dbclient/Assets/app-icon.ico" Width="48" Height="48" RenderOptions.BitmapInterpolationMode="HighQuality"/>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock x:Name="ProductText" Text="dbclient" FontSize="20" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="VersionText" Text="" FontSize="12" Foreground="{DynamicResource SecondaryText}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Text="A modern cross-platform SQL client for SQL Server, MySQL and SQLite."
+                               TextWrapping="Wrap" FontSize="12" Margin="0,4,0,4"/>
+
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,4,0,0">
+                        <Grid.Styles>
+                            <Style Selector="TextBlock.k">
+                                <Setter Property="Foreground" Value="{DynamicResource SecondaryText}"/>
+                                <Setter Property="FontSize" Value="12"/>
+                                <Setter Property="Margin" Value="0,2,16,2"/>
+                            </Style>
+                            <Style Selector="TextBlock.v">
+                                <Setter Property="FontSize" Value="12"/>
+                                <Setter Property="Margin" Value="0,2"/>
+                                <Setter Property="TextWrapping" Value="Wrap"/>
+                            </Style>
+                        </Grid.Styles>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="k" Text="Runtime"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" Classes="v" x:Name="RuntimeText"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="k" Text="OS"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Classes="v" x:Name="OsText"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="k" Text="Avalonia"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Classes="v" x:Name="AvaloniaText"/>
+                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="k" Text="Data folder"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Classes="v" x:Name="DataDirText"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0" Classes="k" Text="Log file"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" Classes="v" x:Name="LogFileText"/>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
+                        <Button Content="GitHub repository" Click="OpenRepo_Click"/>
+                        <Button Content="Report an issue" Click="OpenIssues_Click"/>
+                    </StackPanel>
+
+                    <TextBlock x:Name="CopyrightText" Text="" FontSize="11" Foreground="{DynamicResource SecondaryText}" Margin="0,8,0,0"/>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Shortcuts page -->
+            <ScrollViewer x:Name="ShortcutsPage" Padding="16,12" IsVisible="False">
+                <StackPanel x:Name="ShortcutsList" Spacing="2"/>
+            </ScrollViewer>
+        </Panel>
+    </DockPanel>
+
+    <Window.Styles>
+        <Style Selector="Button.close:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#ff5555"/>
+        </Style>
+        <Style Selector="Button.primary /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#bd93f9"/>
+        </Style>
+        <Style Selector="Button.primary">
+            <Setter Property="Foreground" Value="#282a36"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#caa4fa"/>
+        </Style>
+        <Style Selector="Button.page">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0,0,0,2"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Foreground" Value="{DynamicResource SecondaryText}"/>
+        </Style>
+        <Style Selector="Button.page.active">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TitleBarForeground}"/>
+        </Style>
+        <Style Selector="Button.page /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+    </Window.Styles>
+</Window>

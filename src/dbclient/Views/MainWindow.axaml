@@ -19,15 +19,37 @@
         PointerReleased="Window_PointerReleased">
 
     <Window.KeyBindings>
+        <!-- File -->
         <KeyBinding Gesture="Ctrl+N" Command="{Binding NewQueryTabCommand}" />
         <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseQueryTabCommand}" CommandParameter="{Binding SelectedConnectionTab.SelectedQueryTab}" />
+        <KeyBinding Gesture="Ctrl+Tab" Command="{Binding NextQueryTabCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+Tab" Command="{Binding PrevQueryTabCommand}" />
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFileCommand}" />
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveFileCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveFileAsCommand}" />
+        <!-- Query -->
         <KeyBinding Gesture="F5" Command="{Binding ExecuteQueryCommand}" />
         <KeyBinding Gesture="Ctrl+Return" Command="{Binding ExecuteQueryCommand}" />
-        <KeyBinding Gesture="Ctrl+L" Command="{Binding ToggleConnectionPanelCommand}" />
         <KeyBinding Gesture="Escape" Command="{Binding CancelQueryCommand}" />
-        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
+        <KeyBinding Gesture="Ctrl+E" Command="{Binding ExplainQueryCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+F" Command="{Binding FormatQueryCommand}" />
+        <!-- Editor -->
+        <KeyBinding Gesture="Ctrl+OemQuestion" Command="{Binding ToggleCommentCommand}" />
+        <KeyBinding Gesture="Ctrl+OemPlus" Command="{Binding ZoomInCommand}" />
+        <KeyBinding Gesture="Ctrl+Add" Command="{Binding ZoomInCommand}" />
+        <KeyBinding Gesture="Ctrl+OemMinus" Command="{Binding ZoomOutCommand}" />
+        <KeyBinding Gesture="Ctrl+Subtract" Command="{Binding ZoomOutCommand}" />
+        <KeyBinding Gesture="Ctrl+D0" Command="{Binding ZoomResetCommand}" />
+        <KeyBinding Gesture="Ctrl+NumPad0" Command="{Binding ZoomResetCommand}" />
+        <KeyBinding Gesture="Alt+Z" Command="{Binding ToggleWordWrapCommand}" />
+        <!-- View -->
+        <KeyBinding Gesture="Ctrl+L" Command="{Binding ToggleConnectionPanelCommand}" />
         <KeyBinding Gesture="Ctrl+H" Command="{Binding ToggleHistoryPanelCommand}" />
+        <KeyBinding Gesture="Ctrl+T" Command="{Binding ToggleThemeCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+E" Command="{Binding #MainWin.FocusTreeFilterCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+R" Command="{Binding #MainWin.ToggleResultsFilterCommand}" />
+        <!-- Help -->
+        <KeyBinding Gesture="F1" Command="{Binding #MainWin.ShowShortcutsCommand}" />
     </Window.KeyBindings>
 
     <Panel>
@@ -38,8 +60,9 @@
                     Height="32">
                 <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                     <Image Grid.Column="0"
-                           Source="avares://dbclient/Assets/app-icon.ico"
+                           Source="avares://dbclient/Assets/app-icon-small.png"
                            Width="18" Height="18"
+                           RenderOptions.BitmapInterpolationMode="HighQuality"
                            Margin="10,0,4,0" VerticalAlignment="Center"/>
 
                     <Menu Grid.Column="1" VerticalAlignment="Center" Background="Transparent">
@@ -63,6 +86,21 @@
                                           Stroke="{DynamicResource MenuIconColor}" StrokeThickness="1.5" StrokeLineCap="Round" Stretch="Uniform" Width="14" Height="14"/>
                                 </MenuItem.Icon>
                             </MenuItem>
+                            <Separator />
+                            <MenuItem Header="_Open SQL..." Command="{Binding OpenFileCommand}" InputGesture="Ctrl+O">
+                                <MenuItem.Icon>
+                                    <Path Data="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
+                                          Stroke="{DynamicResource MenuIconColor}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="14" Height="14"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="_Save" Command="{Binding SaveFileCommand}" InputGesture="Ctrl+S">
+                                <MenuItem.Icon>
+                                    <Path Data="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7 M7 3v4a1 1 0 0 0 1 1h7"
+                                          Stroke="{DynamicResource MenuIconColor}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="14" Height="14"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Save _As..." Command="{Binding SaveFileAsCommand}" InputGesture="Ctrl+Shift+S"/>
+                            <MenuItem Header="Save _Workspace" Command="{Binding SaveCommand}" ToolTip.Tip="Workspace state autosaves; this forces a save now"/>
                             <Separator />
                             <MenuItem Header="E_xit" Click="Exit_Click" InputGesture="Alt+F4"/>
                         </MenuItem>
@@ -93,6 +131,25 @@
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator/>
+                            <MenuItem Header="{Binding RowLimitDisplay}">
+                                <MenuItem.Icon>
+                                    <Path Data="M12 3v18 M3 12h18 M3 3h18v18H3z"
+                                          Stroke="{DynamicResource MenuIconColor}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="14" Height="14"/>
+                                </MenuItem.Icon>
+                                <MenuItem Header="1,000 rows" Command="{Binding SetRowLimitCommand}" CommandParameter="1000">
+                                    <MenuItem.Icon><CheckBox IsChecked="{Binding IsRowLimit1K}" BorderThickness="0" IsHitTestVisible="False"/></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="10,000 rows" Command="{Binding SetRowLimitCommand}" CommandParameter="10000">
+                                    <MenuItem.Icon><CheckBox IsChecked="{Binding IsRowLimit10K}" BorderThickness="0" IsHitTestVisible="False"/></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="100,000 rows" Command="{Binding SetRowLimitCommand}" CommandParameter="100000">
+                                    <MenuItem.Icon><CheckBox IsChecked="{Binding IsRowLimit100K}" BorderThickness="0" IsHitTestVisible="False"/></MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="Unlimited" Command="{Binding SetRowLimitCommand}" CommandParameter="0">
+                                    <MenuItem.Icon><CheckBox IsChecked="{Binding IsRowLimitUnlimited}" BorderThickness="0" IsHitTestVisible="False"/></MenuItem.Icon>
+                                </MenuItem>
+                            </MenuItem>
+                            <Separator/>
                             <MenuItem Header="_History" x:Name="HistoryMenu" SubmenuOpened="HistoryMenu_SubmenuOpened">
                                 <MenuItem.Icon>
                                     <Path Data="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8 M3 3v5h5 M12 7v5l4 2"
@@ -112,8 +169,36 @@
                                     <CheckBox IsChecked="{Binding IsHistoryPanelOpen}" BorderThickness="0" IsHitTestVisible="False"/>
                                 </MenuItem.Icon>
                             </MenuItem>
+                            <MenuItem Header="Focus Schema _Filter" Click="FocusTreeFilter_Click" InputGesture="Ctrl+Shift+E"/>
+                            <MenuItem Header="Toggle _Results Filter" Click="ToggleResultsFilter_Click" InputGesture="Ctrl+Shift+R"/>
+                            <Separator/>
+                            <MenuItem Header="_Word Wrap" Command="{Binding ToggleWordWrapCommand}" InputGesture="Alt+Z">
+                                <MenuItem.Icon>
+                                    <CheckBox IsChecked="{Binding EditorWordWrap}" BorderThickness="0" IsHitTestVisible="False"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Zoom _In" Command="{Binding ZoomInCommand}" InputGesture="Ctrl+OemPlus"/>
+                            <MenuItem Header="Zoom _Out" Command="{Binding ZoomOutCommand}" InputGesture="Ctrl+OemMinus"/>
+                            <MenuItem Header="Reset _Zoom" Command="{Binding ZoomResetCommand}" InputGesture="Ctrl+D0"/>
                             <Separator/>
                             <MenuItem Header="{Binding ThemeDisplayName}" Command="{Binding ToggleThemeCommand}" InputGesture="Ctrl+T"/>
+                        </MenuItem>
+                        <MenuItem Header="_Help">
+                            <MenuItem Header="_Keyboard Shortcuts" Click="Shortcuts_Click" InputGesture="F1">
+                                <MenuItem.Icon>
+                                    <Path Data="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z M6 8h.01 M10 8h.01 M14 8h.01 M18 8h.01 M8 12h.01 M12 12h.01 M16 12h.01 M7 16h10"
+                                          Stroke="{DynamicResource MenuIconColor}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="14" Height="14"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Open _Log Folder" Click="OpenLogFolder_Click"/>
+                            <MenuItem Header="_GitHub Repository" Click="OpenRepo_Click"/>
+                            <Separator/>
+                            <MenuItem Header="_About dbclient" Click="About_Click">
+                                <MenuItem.Icon>
+                                    <Path Data="M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0 M12 16v-4 M12 8h.01"
+                                          Stroke="{DynamicResource MenuIconColor}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="14" Height="14"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
                         </MenuItem>
                     </Menu>
 
@@ -159,7 +244,7 @@
             </Border>
 
             <!-- Main Content -->
-            <Grid>
+            <Grid x:Name="MainGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="0" MinWidth="0"/>
                     <ColumnDefinition Width="0"/>

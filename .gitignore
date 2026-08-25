@@ -36,5 +36,6 @@ credentials.json
 *.pfx
 *.key
 *.pem
-/.claude
-/.github
+
+# Test / misc
+TestResults/

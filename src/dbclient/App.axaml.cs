@@ -1,7 +1,11 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
+using Avalonia.Threading;
+using dbclient.Data.Connections;
+using dbclient.Services;
 using dbclient.Themes;
 using dbclient.ViewModels;
 using dbclient.Views;
@@ -42,13 +46,84 @@ public partial class App : Application
                 DataContext = viewModel
             };
 
+            // Unhandled exceptions on the UI thread: log, save state, show a dialog, keep running.
+            Dispatcher.UIThread.UnhandledException += (_, e) =>
+            {
+                AppLogger.Error("Unhandled UI exception", e.Exception);
+                try { viewModel.SaveState(); } catch { /* best effort */ }
+                e.Handled = true;
+                ShowErrorDialog(desktop.MainWindow, e.Exception);
+            };
+
+            // SSH unknown host key prompt. The lib invokes this on a background thread, so blocking
+            // on the dispatcher here is safe.
+            SshTunnel.UnknownHostKeyHandler = info =>
+                Dispatcher.UIThread.InvokeAsync(() => ConfirmHostKeyAsync(desktop.MainWindow, info))
+                    .GetAwaiter().GetResult();
+
             desktop.ShutdownRequested += (_, _) =>
             {
-                viewModel.SaveState();
+                try { viewModel.SaveState(); }
+                catch (Exception ex) { AppLogger.Error("SaveState on shutdown failed", ex); }
+
+                try
+                {
+                    var shutdown = viewModel.ShutdownAsync();
+                    if (Task.WhenAny(shutdown, Task.Delay(3000)).GetAwaiter().GetResult() != shutdown)
+                        AppLogger.Warn("ShutdownAsync did not complete within 3s; exiting anyway");
+                    else if (shutdown.IsFaulted)
+                        AppLogger.Error("ShutdownAsync failed", shutdown.Exception);
+                }
+                catch (Exception ex) { AppLogger.Error("Shutdown failed", ex); }
             };
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static void ShowErrorDialog(Window? owner, Exception ex)
+    {
+        try
+        {
+            var dialog = new ErrorDialog(
+                $"Something went wrong: {ex.Message}\n\nThe application will keep running, but you may want to save your work.",
+                ex);
+            if (owner != null && owner.IsVisible)
+                _ = dialog.ShowDialog(owner);
+            else
+                dialog.Show();
+        }
+        catch (Exception dialogEx)
+        {
+            AppLogger.Error("Failed to show error dialog", dialogEx);
+        }
+    }
+
+    private static async Task<bool> ConfirmHostKeyAsync(Window? owner, SshHostKeyInfo info)
+    {
+        try
+        {
+            var dialog = new HostKeyDialog(info.Host, info.Port, info.KeyType, info.FingerprintSha256, info.FingerprintMd5);
+            bool? result = owner != null && owner.IsVisible
+                ? await dialog.ShowDialog<bool?>(owner)
+                : await ShowStandaloneAsync(dialog);
+            var trusted = result == true;
+            AppLogger.Info($"SSH host key for {info.Host}:{info.Port} ({info.KeyType}, {info.FingerprintSha256}) {(trusted ? "trusted" : "rejected")} by user");
+            return trusted;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Host key prompt failed; rejecting host", ex);
+            return false;
+        }
+    }
+
+    private static Task<bool?> ShowStandaloneAsync(HostKeyDialog dialog)
+    {
+        var tcs = new TaskCompletionSource<bool?>();
+        dialog.Closed += (_, _) => tcs.TrySetResult(dialog.Trusted);
+        dialog.Show();
+        return tcs.Task;
     }
 
     public void SetTheme(string themeName)

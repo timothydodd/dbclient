@@ -3,7 +3,7 @@
         x:Class="dbclient.Views.ApplyChangesDialog"
         Title="Apply Changes"
         Width="600"
-        Height="400"
+        Height="460"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         CanResize="True"
@@ -57,6 +57,22 @@
                 <Button Content="Cancel" Click="Cancel_Click" Width="80"/>
             </StackPanel>
         </Border>
+
+        <!-- Notes / warnings -->
+        <StackPanel DockPanel.Dock="Top" Margin="12,8,12,4" Spacing="4">
+            <TextBlock x:Name="ExpectedText"
+                       Foreground="{DynamicResource SecondaryText}"
+                       FontSize="11" TextWrapping="Wrap"/>
+            <TextBlock Text="Runs inside a transaction. A cell containing the literal NULL is written as SQL NULL."
+                       Foreground="{DynamicResource SecondaryText}"
+                       FontSize="11" TextWrapping="Wrap"/>
+            <TextBlock x:Name="EditedWarning"
+                       Text="You edited the generated SQL &#8212; it will run as-is."
+                       Foreground="#ff5555"
+                       FontWeight="SemiBold"
+                       FontSize="11" TextWrapping="Wrap"
+                       IsVisible="False"/>
+        </StackPanel>
 
         <!-- SQL Text -->
         <TextBox x:Name="SqlTextBox"

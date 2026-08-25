@@ -1,14 +1,13 @@
 using System.Xml;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Platform.Storage;
 using Avalonia;
 using AvaloniaEdit;
 using AvaloniaEdit.CodeCompletion;
+using AvaloniaEdit.Document;
 using AvaloniaEdit.Highlighting;
 using AvaloniaEdit.Search;
 using AvaloniaEdit.Highlighting.Xshd;
-using dbclient.IntelliSense;
 using dbclient.IntelliSense.Interfaces;
 using dbclient.ViewModels;
 
@@ -18,9 +17,10 @@ public partial class EditorView : UserControl
 {
     private TextEditor? _editor;
     private CompletionWindow? _completionWindow;
+    private SessionTabViewModel? _vm;
+    private MainWindowViewModel? _mainVm;
 
-    private IIntelliSenseProvider? CurrentProvider =>
-        (DataContext as SessionTabViewModel)?.IntelliSenseProvider;
+    private IIntelliSenseProvider? CurrentProvider => _vm?.IntelliSenseProvider;
     private static IHighlightingDefinition? _sqlHighlighting;
 
     public EditorView()
@@ -49,14 +49,14 @@ public partial class EditorView : UserControl
 
             _editor.TextChanged += (_, _) =>
             {
-                if (DataContext is SessionTabViewModel vm)
-                {
-                    vm.QueryText = _editor.Text;
-                }
+                if (_vm != null)
+                    _vm.QueryText = _editor.Text;
             };
         }
 
         DataContextChanged += OnDataContextChanged;
+        AttachedToVisualTree += OnAttached;
+        DetachedFromVisualTree += OnDetached;
     }
 
     private static IHighlightingDefinition? GetSqlHighlighting()
@@ -73,9 +73,9 @@ public partial class EditorView : UserControl
                 _sqlHighlighting = HighlightingLoader.Load(reader, HighlightingManager.Instance);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Fall back to built-in TSQL if our custom one fails
+            Services.AppLogger.Error("Failed to load sql.xshd; falling back to TSQL", ex);
             _sqlHighlighting = HighlightingManager.Instance.GetDefinition("TSQL");
         }
 
@@ -129,40 +129,174 @@ public partial class EditorView : UserControl
             color.Foreground = new SimpleHighlightingBrush(Avalonia.Media.Color.Parse(hex));
     }
 
+    // ---- Editor settings (font size / word wrap) come from the window-level view model ----
+
+    private void OnAttached(object? sender, EventArgs e)
+    {
+        try
+        {
+            var mainVm = TopLevel.GetTopLevel(this)?.DataContext as MainWindowViewModel;
+            if (!ReferenceEquals(mainVm, _mainVm))
+            {
+                if (_mainVm != null) _mainVm.PropertyChanged -= OnMainVmPropertyChanged;
+                _mainVm = mainVm;
+                if (_mainVm != null) _mainVm.PropertyChanged += OnMainVmPropertyChanged;
+            }
+            ApplyEditorSettings();
+        }
+        catch (Exception ex)
+        {
+            Services.AppLogger.Error("EditorView attach failed", ex);
+        }
+    }
+
+    private void OnDetached(object? sender, EventArgs e)
+    {
+        if (_mainVm != null) _mainVm.PropertyChanged -= OnMainVmPropertyChanged;
+        _mainVm = null;
+    }
+
+    private void OnMainVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(MainWindowViewModel.EditorFontSize) or nameof(MainWindowViewModel.EditorWordWrap))
+            ApplyEditorSettings();
+    }
+
+    private void ApplyEditorSettings()
+    {
+        if (_editor == null || _mainVm == null) return;
+        _editor.FontSize = _mainVm.EditorFontSize;
+        _editor.WordWrap = _mainVm.EditorWordWrap;
+        _editor.HorizontalScrollBarVisibility = _mainVm.EditorWordWrap
+            ? Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
+            : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
+    }
+
+    // ---- DataContext (per query tab) ----
+
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
-        if (DataContext is SessionTabViewModel vm)
+        // Unsubscribe from the previous tab so handlers don't accumulate across tab switches.
+        if (_vm != null)
         {
-            if (_editor != null && _editor.Text != vm.QueryText)
-                _editor.Text = vm.QueryText;
+            _vm.ExecuteRequested -= OnExecuteRequested;
+            _vm.QueryTextSet -= OnQueryTextSet;
+            _vm.EditorActionRequested -= OnEditorActionRequested;
+        }
 
-            vm.ExecuteRequested += OnExecuteRequested;
-            vm.QueryTextSet += (_, text) =>
+        _vm = DataContext as SessionTabViewModel;
+
+        if (_vm != null)
+        {
+            if (_editor != null && _editor.Text != _vm.QueryText)
+                _editor.Text = _vm.QueryText;
+
+            _vm.ExecuteRequested += OnExecuteRequested;
+            _vm.QueryTextSet += OnQueryTextSet;
+            _vm.EditorActionRequested += OnEditorActionRequested;
+        }
+    }
+
+    private void OnQueryTextSet(object? sender, string text)
+    {
+        if (_editor != null && _editor.Text != text)
+            _editor.Text = text;
+    }
+
+    private void OnEditorActionRequested(object? sender, string action)
+    {
+        try
+        {
+            switch (action)
             {
-                if (_editor != null && _editor.Text != text)
-                    _editor.Text = text;
-            };
+                case "ToggleComment":
+                    ToggleLineComment();
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Services.AppLogger.Error($"Editor action '{action}' failed", ex);
+        }
+    }
+
+    /// <summary>
+    /// Ctrl+/: toggle a "-- " line comment on every line touched by the selection (or the caret line).
+    /// If every non-blank line in the range is already commented, the comment prefix is removed.
+    /// </summary>
+    private void ToggleLineComment()
+    {
+        if (_editor == null) return;
+        var doc = _editor.Document;
+        var sel = _editor.TextArea.Selection;
+
+        int startOffset, endOffset;
+        if (sel.IsEmpty)
+        {
+            startOffset = endOffset = _editor.CaretOffset;
+        }
+        else
+        {
+            startOffset = Math.Min(sel.SurroundingSegment.Offset, sel.SurroundingSegment.EndOffset);
+            endOffset = Math.Max(sel.SurroundingSegment.Offset, sel.SurroundingSegment.EndOffset);
+            // A selection ending exactly at a line start shouldn't include that line.
+            if (endOffset > startOffset && doc.GetLineByOffset(endOffset).Offset == endOffset)
+                endOffset--;
+        }
+
+        var firstLine = doc.GetLineByOffset(startOffset).LineNumber;
+        var lastLine = doc.GetLineByOffset(endOffset).LineNumber;
+
+        var lines = new List<DocumentLine>();
+        for (var n = firstLine; n <= lastLine; n++)
+            lines.Add(doc.GetLineByNumber(n));
+
+        var nonBlank = lines.Where(l => !string.IsNullOrWhiteSpace(doc.GetText(l))).ToList();
+        var allCommented = nonBlank.Count > 0 && nonBlank.All(l => doc.GetText(l).TrimStart().StartsWith("--"));
+
+        using (doc.RunUpdate())
+        {
+            // Walk backwards so earlier offsets stay valid.
+            for (var i = lines.Count - 1; i >= 0; i--)
+            {
+                var line = lines[i];
+                var text = doc.GetText(line);
+                if (allCommented)
+                {
+                    var idx = text.IndexOf("--", StringComparison.Ordinal);
+                    if (idx < 0) continue;
+                    var len = 2;
+                    if (idx + 2 < text.Length && text[idx + 2] == ' ') len = 3;
+                    doc.Remove(line.Offset + idx, len);
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(text) && lines.Count > 1) continue;
+                    var indent = text.Length - text.TrimStart().Length;
+                    doc.Insert(line.Offset + indent, "-- ");
+                }
+            }
         }
     }
 
     private void OnExecuteRequested(object? sender, EventArgs e)
     {
         // Get selected text or full text
-        if (DataContext is SessionTabViewModel vm && _editor != null)
+        if (_vm != null && _editor != null)
         {
             var text = string.IsNullOrEmpty(_editor.SelectedText)
                 ? _editor.Text
                 : _editor.SelectedText;
-            vm.QueryTextToExecute = text;
+            _vm.QueryTextToExecute = text;
         }
     }
 
     private void OnCaretPositionChanged(object? sender, EventArgs e)
     {
-        if (DataContext is SessionTabViewModel vm && _editor != null)
+        if (_vm != null && _editor != null)
         {
-            vm.CursorLine = _editor.TextArea.Caret.Line;
-            vm.CursorColumn = _editor.TextArea.Caret.Column;
+            _vm.CursorLine = _editor.TextArea.Caret.Line;
+            _vm.CursorColumn = _editor.TextArea.Caret.Column;
         }
     }
 
@@ -185,36 +319,43 @@ public partial class EditorView : UserControl
 
     private async void OnTextEntered(object? sender, TextInputEventArgs e)
     {
-        if (_editor == null || CurrentProvider == null || e.Text == null)
-            return;
-
-        var ch = e.Text.Length > 0 ? e.Text[0] : '\0';
-
-        // Dot always triggers fresh completion (for table.column)
-        if (ch == '.')
+        try
         {
-            if (_completionWindow != null)
+            if (_editor == null || CurrentProvider == null || e.Text == null)
+                return;
+
+            var ch = e.Text.Length > 0 ? e.Text[0] : '\0';
+
+            // Dot always triggers fresh completion (for table.column)
+            if (ch == '.')
             {
-                _completionWindow.Close();
-                _completionWindow = null;
+                if (_completionWindow != null)
+                {
+                    _completionWindow.Close();
+                    _completionWindow = null;
+                }
+                await ShowCompletionAsync();
+                return;
             }
-            await ShowCompletionAsync();
-            return;
+
+            bool shouldTrigger = char.IsLetterOrDigit(ch) || ch == '_';
+
+            if (ch == ' ')
+            {
+                var textBeforeCursor = _editor.Text[..Math.Min(_editor.CaretOffset, _editor.Text.Length)];
+                var trimmed = textBeforeCursor.TrimEnd();
+                var lastWord = GetLastWord(trimmed);
+                shouldTrigger = IsKeyword(lastWord);
+            }
+
+            if (shouldTrigger && _completionWindow == null)
+            {
+                await ShowCompletionAsync();
+            }
         }
-
-        bool shouldTrigger = char.IsLetterOrDigit(ch) || ch == '_';
-
-        if (ch == ' ')
+        catch (Exception ex)
         {
-            var textBeforeCursor = _editor.Text[..Math.Min(_editor.CaretOffset, _editor.Text.Length)];
-            var trimmed = textBeforeCursor.TrimEnd();
-            var lastWord = GetLastWord(trimmed);
-            shouldTrigger = IsKeyword(lastWord);
-        }
-
-        if (shouldTrigger && _completionWindow == null)
-        {
-            await ShowCompletionAsync();
+            Services.AppLogger.Error("OnTextEntered failed", ex);
         }
     }
 
@@ -240,12 +381,6 @@ public partial class EditorView : UserControl
             var wordStart = offset;
             while (wordStart > 0 && (char.IsLetterOrDigit(text[wordStart - 1]) || text[wordStart - 1] == '_'))
                 wordStart--;
-
-            // Don't include the dot in the replacement
-            if (wordStart > 0 && text[wordStart - 1] == '.')
-            {
-                // We're after a dot, only replace what's after the dot
-            }
 
             _completionWindow.StartOffset = wordStart;
 

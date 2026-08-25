@@ -16,8 +16,9 @@ public class ConnectionTabViewModel : ViewModelBase
     private SessionTabViewModel? _selectedQueryTab;
     private string _activeDatabase = "";
     private string _statusText = "Connecting...";
-    private string _executionTimeText = "";
     private int _queryTabCounter;
+    private int _maxRows = 100_000;
+    private System.ComponentModel.PropertyChangedEventHandler? _selectedQueryTabHandler;
     private string _treeFilter = "";
 
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
@@ -72,10 +73,60 @@ public class ConnectionTabViewModel : ViewModelBase
         IntelliSenseProvider = new SqlIntelliSenseProvider();
     }
 
+    /// <summary>Raised whenever any query tab's text changes (drives the debounced autosave).</summary>
+    public event EventHandler? TabTextChanged;
+
+    /// <summary>
+    /// Set by the owner (MainWindowViewModel) to prompt before discarding a tab. Args: title, message.
+    /// Returns true to proceed. When null, closes proceed without asking.
+    /// </summary>
+    public Func<string, string, Task<bool>>? ConfirmHandler { get; set; }
+
+    /// <summary>Row cap applied to the underlying connection (0 = unlimited).</summary>
+    public int MaxRows
+    {
+        get => _maxRows;
+        set
+        {
+            if (SetField(ref _maxRows, value))
+                ApplyMaxRows();
+        }
+    }
+
+    private void ApplyMaxRows()
+    {
+        if (Connection is ConnectionBase cb)
+            cb.MaxRows = _maxRows;
+    }
+
     public SessionTabViewModel? SelectedQueryTab
     {
         get => _selectedQueryTab;
-        set => SetField(ref _selectedQueryTab, value);
+        set
+        {
+            var old = _selectedQueryTab;
+            if (!SetField(ref _selectedQueryTab, value)) return;
+
+            // Forward the selected tab's per-tab status/timing so the status bar bindings update.
+            if (old != null && _selectedQueryTabHandler != null)
+                old.PropertyChanged -= _selectedQueryTabHandler;
+            _selectedQueryTabHandler = null;
+
+            if (value != null)
+            {
+                _selectedQueryTabHandler = (_, e) =>
+                {
+                    if (e.PropertyName == nameof(SessionTabViewModel.StatusText))
+                        OnPropertyChanged(nameof(StatusText));
+                    else if (e.PropertyName == nameof(SessionTabViewModel.ExecutionTimeText))
+                        OnPropertyChanged(nameof(ExecutionTimeText));
+                };
+                value.PropertyChanged += _selectedQueryTabHandler;
+            }
+
+            OnPropertyChanged(nameof(StatusText));
+            OnPropertyChanged(nameof(ExecutionTimeText));
+        }
     }
 
     public string ActiveDatabase
@@ -84,23 +135,32 @@ public class ConnectionTabViewModel : ViewModelBase
         set => SetField(ref _activeDatabase, value);
     }
 
+    /// <summary>
+    /// Status bar text. The selected query tab's own status (last execution outcome) wins when set;
+    /// otherwise the connection-level status (connecting / loading / connected) is shown.
+    /// Setting this sets the connection-level status.
+    /// </summary>
     public string StatusText
     {
-        get => _statusText;
+        get
+        {
+            var tabStatus = _selectedQueryTab?.StatusText;
+            // Connection-level activity/errors take precedence over a stale per-tab result line.
+            if (_isSchemaLoading || _hasConnectionError || string.IsNullOrEmpty(tabStatus))
+                return _statusText;
+            return tabStatus;
+        }
         set => SetField(ref _statusText, value);
     }
 
-    public string ExecutionTimeText
-    {
-        get => _executionTimeText;
-        set => SetField(ref _executionTimeText, value);
-    }
+    /// <summary>Pass-through to the selected tab's execution time (per-tab, so switching tabs shows the right timing).</summary>
+    public string ExecutionTimeText => _selectedQueryTab?.ExecutionTimeText ?? "";
 
     private bool _hasConnectionError;
     public bool HasConnectionError
     {
         get => _hasConnectionError;
-        set => SetField(ref _hasConnectionError, value);
+        set { if (SetField(ref _hasConnectionError, value)) OnPropertyChanged(nameof(StatusText)); }
     }
 
     private string _connectionError = "";
@@ -114,7 +174,7 @@ public class ConnectionTabViewModel : ViewModelBase
     public bool IsSchemaLoading
     {
         get => _isSchemaLoading;
-        set => SetField(ref _isSchemaLoading, value);
+        set { if (SetField(ref _isSchemaLoading, value)) OnPropertyChanged(nameof(StatusText)); }
     }
 
     public async Task ConnectAsync()
@@ -126,6 +186,7 @@ public class ConnectionTabViewModel : ViewModelBase
         try
         {
             Connection = ConnectionDialog.CreateProvider(Config);
+            ApplyMaxRows();
             StatusText = $"Connecting to {DisplayName}...";
 
             var master = await Connection.LoadDatabasesAsync();
@@ -262,6 +323,8 @@ public class ConnectionTabViewModel : ViewModelBase
                 IntelliSenseProvider = IntelliSenseProvider
             };
             tab.SetInitialQueryText(ts.QueryText);
+            tab.RestoreFileBacking(ts.FilePath);
+            AttachTab(tab);
             list.Add(tab);
         }
         if (list.Count == 0) return;
@@ -286,7 +349,8 @@ public class ConnectionTabViewModel : ViewModelBase
                 Title = t.Title,
                 QueryText = t.QueryText,
                 Database = _tabsActiveDb,
-                Order = i
+                Order = i,
+                FilePath = t.FilePath
             };
         }
 
@@ -301,7 +365,8 @@ public class ConnectionTabViewModel : ViewModelBase
                     Title = t.Title,
                     QueryText = t.QueryText,
                     Database = db,
-                    Order = i
+                    Order = i,
+                    FilePath = t.FilePath
                 };
             }
         }
@@ -513,7 +578,12 @@ public class ConnectionTabViewModel : ViewModelBase
             var pkTag = col.IsPrimaryKey ? " PK" : "";
             var nullTag = col.IsNullable ? " NULL" : "";
             tableNode.Children.Add(new ConnectionTreeNode(
-                col.Name, ConnectionTreeNodeType.Column, $"{col.DataType}{pkTag}{nullTag}"));
+                col.Name, ConnectionTreeNodeType.Column, $"{col.DataType}{pkTag}{nullTag}")
+            {
+                IsPrimaryKey = col.IsPrimaryKey,
+                IsNullable = col.IsNullable,
+                DataType = col.DataType ?? "",
+            });
         }
     }
 
@@ -527,92 +597,161 @@ public class ConnectionTabViewModel : ViewModelBase
             IntelliSenseProvider = IntelliSenseProvider
         };
         tab.SetInitialQueryText(queryText);
+        AttachTab(tab);
 
         QueryTabs.Add(tab);
         SelectedQueryTab = tab;
         return tab;
     }
 
-    public void CloseQueryTab(SessionTabViewModel? tab)
+    private void AttachTab(SessionTabViewModel tab)
+    {
+        tab.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SessionTabViewModel.QueryText))
+                TabTextChanged?.Invoke(this, EventArgs.Empty);
+        };
+    }
+
+    /// <summary>
+    /// Ask the user (via <see cref="ConfirmHandler"/>) whether it is OK to discard the tab.
+    /// Returns true when the tab has nothing worth keeping or the user confirmed.
+    /// </summary>
+    private async Task<bool> ConfirmCloseAsync(SessionTabViewModel tab)
+    {
+        if (!tab.ShouldConfirmClose || ConfirmHandler == null) return true;
+        var msg = tab.IsFileBacked
+            ? $"Close '{tab.Title}'? Unsaved changes will be lost."
+            : $"Close '{tab.Title}'? Unsaved query will be lost.";
+        return await ConfirmHandler("Close Tab", msg);
+    }
+
+    private static void DetachTab(SessionTabViewModel tab)
+    {
+        try { tab.ExecutionCts?.Cancel(); }
+        catch (Exception ex) { AppLogger.Error("Cancel on tab close failed", ex); }
+    }
+
+    /// <summary>Cancel every running query in this connection (open and stashed tabs).</summary>
+    public void CancelAllQueries()
+    {
+        foreach (var t in AllTabs()) DetachTab(t);
+    }
+
+    public Task CloseQueryTab(SessionTabViewModel? tab) => CloseQueryTabAsync(tab);
+
+    public async Task CloseQueryTabAsync(SessionTabViewModel? tab)
     {
         tab ??= SelectedQueryTab;
         if (tab == null) return;
+        if (!await ConfirmCloseAsync(tab)) return;
 
         var index = QueryTabs.IndexOf(tab);
+        DetachTab(tab);
         QueryTabs.Remove(tab);
 
         if (QueryTabs.Count > 0)
-            SelectedQueryTab = QueryTabs[Math.Min(index, QueryTabs.Count - 1)];
+            SelectedQueryTab = QueryTabs[Math.Min(Math.Max(index, 0), QueryTabs.Count - 1)];
         else
             NewQueryTab();
     }
 
-    public void CloseOtherQueryTabs(SessionTabViewModel tab)
+    private async Task CloseTabsAsync(List<SessionTabViewModel> toRemove, SessionTabViewModel keep)
     {
-        var others = QueryTabs.Where(t => t != tab).ToList();
-        foreach (var t in others)
+        foreach (var t in toRemove)
+        {
+            if (!await ConfirmCloseAsync(t)) continue;
+            DetachTab(t);
             QueryTabs.Remove(t);
-        SelectedQueryTab = tab;
+        }
+        SelectedQueryTab = keep;
     }
 
-    public void CloseQueryTabsToRight(SessionTabViewModel tab)
+    public Task CloseOtherQueryTabs(SessionTabViewModel tab) =>
+        CloseTabsAsync(QueryTabs.Where(t => t != tab).ToList(), tab);
+
+    public Task CloseQueryTabsToRight(SessionTabViewModel tab)
     {
         var index = QueryTabs.IndexOf(tab);
-        if (index < 0) return;
-        var toRemove = QueryTabs.Skip(index + 1).ToList();
-        foreach (var t in toRemove)
-            QueryTabs.Remove(t);
-        SelectedQueryTab = tab;
+        if (index < 0) return Task.CompletedTask;
+        return CloseTabsAsync(QueryTabs.Skip(index + 1).ToList(), tab);
     }
 
-    public void CloseQueryTabsToLeft(SessionTabViewModel tab)
+    public Task CloseQueryTabsToLeft(SessionTabViewModel tab)
     {
         var index = QueryTabs.IndexOf(tab);
-        if (index <= 0) return;
-        var toRemove = QueryTabs.Take(index).ToList();
-        foreach (var t in toRemove)
-            QueryTabs.Remove(t);
-        SelectedQueryTab = tab;
+        if (index <= 0) return Task.CompletedTask;
+        return CloseTabsAsync(QueryTabs.Take(index).ToList(), tab);
     }
 
+    public void SelectNextQueryTab(int direction)
+    {
+        if (QueryTabs.Count == 0) return;
+        var idx = SelectedQueryTab != null ? QueryTabs.IndexOf(SelectedQueryTab) : 0;
+        idx = ((idx + direction) % QueryTabs.Count + QueryTabs.Count) % QueryTabs.Count;
+        SelectedQueryTab = QueryTabs[idx];
+    }
+
+    /// <summary>Execute the selected tab's query (selection or full text).</summary>
     public async Task ExecuteQueryAsync()
     {
-        if (SelectedQueryTab == null) return;
+        // Capture once: the user may switch tabs while the query runs and results must land here.
+        var tab = SelectedQueryTab;
+        if (tab == null) return;
 
-        SelectedQueryTab.RequestExecute();
+        tab.RequestExecute();
 
-        var queryText = !string.IsNullOrWhiteSpace(SelectedQueryTab.QueryTextToExecute)
-            ? SelectedQueryTab.QueryTextToExecute
-            : SelectedQueryTab.QueryText;
+        var queryText = !string.IsNullOrWhiteSpace(tab.QueryTextToExecute)
+            ? tab.QueryTextToExecute
+            : tab.QueryText;
 
-        if (string.IsNullOrWhiteSpace(queryText))
+        await ExecuteSqlAsync(tab, queryText);
+    }
+
+    /// <summary>Core executor: runs <paramref name="sql"/> and writes every outcome onto <paramref name="tab"/>.</summary>
+    public async Task ExecuteSqlAsync(SessionTabViewModel tab, string sql)
+    {
+        if (tab.IsExecuting)
         {
-            SelectedQueryTab.HasMessage = true;
-            SelectedQueryTab.Message = "No query to execute.";
-            SelectedQueryTab.MessageColor = Services.ThemeColors.Warning;
+            tab.StatusText = "Query already running (Esc to cancel)";
             return;
         }
 
-        if (Connection == null)
+        if (string.IsNullOrWhiteSpace(sql))
         {
-            SelectedQueryTab.HasMessage = true;
-            SelectedQueryTab.Message = "Not connected.";
-            SelectedQueryTab.MessageColor = Services.ThemeColors.Warning;
+            tab.HasMessage = true;
+            tab.Message = "No query to execute.";
+            tab.MessageColor = ThemeColors.Warning;
             return;
         }
 
-        SelectedQueryTab.HasMessage = true;
-        SelectedQueryTab.Message = "Executing...";
-        SelectedQueryTab.MessageColor = Services.ThemeColors.Info;
-        SelectedQueryTab.ResultData = null;
+        var connection = Connection;
+        if (connection == null)
+        {
+            tab.HasMessage = true;
+            tab.Message = "Not connected.";
+            tab.MessageColor = ThemeColors.Warning;
+            return;
+        }
+
+        tab.HasMessage = true;
+        tab.Message = "Executing...";
+        tab.MessageColor = ThemeColors.Info;
+        tab.ResultData = null;
+        tab.Messages = "";
+        tab.StatusText = "Executing...";
+        tab.ExecutionTimeText = "";
 
         var cts = new CancellationTokenSource();
-        SelectedQueryTab.ExecutionCts = cts;
-        SelectedQueryTab.IsExecuting = true;
+        tab.ExecutionCts = cts;
+        tab.IsExecuting = true;
 
         try
         {
-            var result = await Connection.ExecuteQueryAsync(ActiveDatabase, queryText, cts.Token);
+            var result = await connection.ExecuteQueryAsync(ActiveDatabase, sql, cts.Token);
+
+            tab.Messages = result.Messages is { Count: > 0 } ? string.Join("\n", result.Messages) : "";
+            tab.ExecutionTimeText = $"{result.ExecutionTime.TotalMilliseconds:F0}ms";
 
             if (result.IsError)
             {
@@ -622,61 +761,80 @@ public class ConnectionTabViewModel : ViewModelBase
                 if (result.ErrorLine.HasValue && result.ErrorLine > 0)
                     errorMsg += $"\n(Line {result.ErrorLine})";
 
-                SelectedQueryTab.HasMessage = true;
-                SelectedQueryTab.Message = errorMsg;
-                SelectedQueryTab.MessageColor = Services.ThemeColors.Error;
-                SelectedQueryTab.RowCountText = "";
+                tab.HasMessage = true;
+                tab.Message = errorMsg;
+                tab.MessageColor = ThemeColors.Error;
+                tab.RowCountText = "";
+                tab.StatusText = "Query failed";
             }
-            else if (result.Data != null && result.Data.Count > 0 && result.Data.Any(d => d.Rows.Count > 0))
+            // A SELECT that returns zero rows still has columns: show an empty grid with headers,
+            // not "0 row(s) affected".
+            else if (result.Data != null && result.Data.Count > 0 && result.Data.Any(d => d.ColumnNames.Length > 0))
             {
-                SelectedQueryTab.ResultData = result.Data;
+                tab.ResultData = result.Data;
                 var totalRows = result.Data.Sum(d => d.Rows.Count);
+                var truncated = result.Data.Any(d => d.Truncated);
 
-                SelectedQueryTab.RowCountText = result.Data.Count > 1
-                    ? $"{totalRows} rows ({result.Data.Count} result sets)"
-                    : $"{totalRows} rows";
-                SelectedQueryTab.HasMessage = false;
-                SelectedQueryTab.Message = "";
+                if (truncated)
+                {
+                    tab.RowCountText = $"Showing first {totalRows:N0} rows (result truncated)";
+                    tab.StatusText = $"Showing first {totalRows:N0} rows (result truncated, row limit {MaxRows:N0})";
+                    AppLogger.Warn($"Result truncated at {totalRows} rows (MaxRows={MaxRows}) on {DisplayName}/{ActiveDatabase}");
+                }
+                else
+                {
+                    tab.RowCountText = result.Data.Count > 1
+                        ? $"{totalRows:N0} rows ({result.Data.Count} result sets)"
+                        : $"{totalRows:N0} rows";
+                    tab.StatusText = $"{totalRows:N0} rows in {tab.ExecutionTimeText}";
+                }
+                tab.HasMessage = false;
+                tab.Message = "";
             }
             else
             {
-                SelectedQueryTab.HasMessage = true;
-                SelectedQueryTab.Message = $"{result.AffectedRows} row(s) affected.";
-                SelectedQueryTab.MessageColor = Services.ThemeColors.Success;
-                SelectedQueryTab.RowCountText = $"{result.AffectedRows} affected";
-                SelectedQueryTab.ResultData = null;
+                tab.HasMessage = true;
+                tab.Message = $"{result.AffectedRows} row(s) affected.";
+                tab.MessageColor = ThemeColors.Success;
+                tab.RowCountText = $"{result.AffectedRows} affected";
+                tab.ResultData = null;
+                tab.StatusText = $"{result.AffectedRows} row(s) affected in {tab.ExecutionTimeText}";
             }
-
-            ExecutionTimeText = $"{result.ExecutionTime.TotalMilliseconds:F0}ms";
         }
         catch (OperationCanceledException)
         {
-            SelectedQueryTab.HasMessage = true;
-            SelectedQueryTab.Message = "Query cancelled.";
-            SelectedQueryTab.MessageColor = Services.ThemeColors.Warning;
-            SelectedQueryTab.RowCountText = "";
+            tab.HasMessage = true;
+            tab.Message = "Query cancelled.";
+            tab.MessageColor = ThemeColors.Warning;
+            tab.RowCountText = "";
+            tab.StatusText = "Query cancelled";
         }
         catch (Exception ex)
         {
-            SelectedQueryTab.HasMessage = true;
-            SelectedQueryTab.Message = ex.Message;
-            SelectedQueryTab.MessageColor = Services.ThemeColors.Error;
+            AppLogger.Error("Query execution failed", ex);
+            tab.HasMessage = true;
+            tab.Message = ex.Message;
+            tab.MessageColor = ThemeColors.Error;
+            tab.StatusText = "Query failed";
         }
         finally
         {
-            SelectedQueryTab.IsExecuting = false;
-            SelectedQueryTab.ExecutionCts = null;
+            tab.IsExecuting = false;
+            if (ReferenceEquals(tab.ExecutionCts, cts))
+                tab.ExecutionCts = null;
             cts.Dispose();
         }
     }
 
     public async Task ExplainQueryAsync()
     {
-        if (SelectedQueryTab == null) return;
+        var tab = SelectedQueryTab;
+        if (tab == null) return;
 
-        var queryText = !string.IsNullOrWhiteSpace(SelectedQueryTab.QueryTextToExecute)
-            ? SelectedQueryTab.QueryTextToExecute
-            : SelectedQueryTab.QueryText;
+        tab.RequestExecute();
+        var queryText = !string.IsNullOrWhiteSpace(tab.QueryTextToExecute)
+            ? tab.QueryTextToExecute
+            : tab.QueryText;
 
         if (string.IsNullOrWhiteSpace(queryText)) return;
 
@@ -687,11 +845,8 @@ public class ConnectionTabViewModel : ViewModelBase
             _ => $"EXPLAIN {queryText}"
         };
 
-        // Temporarily swap query text, execute, then restore
-        var original = SelectedQueryTab.QueryText;
-        SelectedQueryTab.SetQueryText(explainSql);
-        await ExecuteQueryAsync();
-        SelectedQueryTab.SetQueryText(original);
+        // Pass the SQL explicitly instead of swapping the editor text in and out.
+        await ExecuteSqlAsync(tab, explainSql);
     }
 
     // Deterministic color from connection name

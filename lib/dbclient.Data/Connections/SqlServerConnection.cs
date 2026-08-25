@@ -9,19 +9,56 @@ public class SqlServerConnection : ConnectionBase
     public override string Name => $"SQL:{Address}";
     public override string ConnectionType => "SQL Server";
 
-    public bool Encrypted { get; set; }
+    /// <summary>Encrypt the connection (Encrypt=True). Always forced on for Azure AD auth.</summary>
+    public bool Encrypt { get; set; } = true;
+
+    /// <summary>Skip server certificate validation. Only enable for servers with self-signed certificates.</summary>
+    public bool TrustServerCertificate { get; set; } = false;
+
+    /// <summary>Legacy alias for <see cref="Encrypt"/>.</summary>
+    [Obsolete("Use Encrypt")]
+    public bool Encrypted { get => Encrypt; set => Encrypt = value; }
+
     public SqlServerAuthMode AuthMode { get; set; } = SqlServerAuthMode.SqlLogin;
 
     private static int _adProviderRegistered;
+    private string? _lastConnectionString;
 
     public override async Task<IDbConnection> GetConnectionAsync(string database, CancellationToken ct = default)
     {
-        EnsureSshTunnel();
+        await EnsureSshTunnelAsync(ct);
         if (AuthMode == SqlServerAuthMode.AzureDefault)
             EnsureActiveDirectoryProvider();
-        var con = new SqlConnection(BuildConnectionString(database));
-        await con.OpenAsync(ct);
+        var cs = BuildConnectionString(database);
+        _lastConnectionString = cs;
+        var con = new SqlConnection(cs);
+        try
+        {
+            await con.OpenAsync(ct);
+        }
+        catch
+        {
+            con.Dispose();
+            throw;
+        }
         return con;
+    }
+
+    protected override IDisposable? SubscribeInfoMessages(IDbConnection con, List<string> sink)
+    {
+        if (con is not SqlConnection sql) return null;
+        void Handler(object sender, SqlInfoMessageEventArgs e)
+        {
+            foreach (SqlError err in e.Errors)
+                sink.Add(err.Message);
+        }
+        sql.InfoMessage += Handler;
+        return new Unsubscriber(() => sql.InfoMessage -= Handler);
+    }
+
+    private sealed class Unsubscriber(Action dispose) : IDisposable
+    {
+        public void Dispose() => dispose();
     }
 
     // Microsoft.Data.SqlClient 6.0+ moved the Active Directory auth providers out of the core
@@ -46,7 +83,7 @@ public class SqlServerConnection : ConnectionBase
         await ReadDataAsync(con, query, reader =>
         {
             master.Databases.Add(new DbDatabase { Name = (string)reader["name"] });
-        });
+        }, ct);
 
         return master;
     }
@@ -110,7 +147,7 @@ public class SqlServerConnection : ConnectionBase
                 };
 
                 currentColumns?.Add(col);
-            });
+            }, ct);
         }
 
         // Load primary keys
@@ -132,7 +169,7 @@ public class SqlServerConnection : ConnectionBase
                 var col = table?.Columns.FirstOrDefault(c =>
                     c.Name.Equals(columnName, StringComparison.OrdinalIgnoreCase));
                 if (col != null) col.IsPrimaryKey = true;
-            });
+            }, ct);
         }
 
         // Load stored procedures
@@ -151,7 +188,7 @@ public class SqlServerConnection : ConnectionBase
                     Name = (string)reader["SPECIFIC_NAME"],
                     Schema = (string)reader["SPECIFIC_SCHEMA"]
                 });
-            });
+            }, ct);
         }
 
         database.Loaded = true;
@@ -160,25 +197,44 @@ public class SqlServerConnection : ConnectionBase
 
     private string BuildConnectionString(string database)
     {
-        var portPart = "";
+        var server = Address;
         if (UseSSH)
-            portPart = $",{EstablishedSshPort}";
+            server = $"127.0.0.1,{EstablishedSshPort}";
         else if (!string.IsNullOrWhiteSpace(Port))
-            portPart = $",{Port}";
+            server = $"{Address},{Port}";
 
-        var baseStr = $"Server={Address}{portPart};Database={database};" +
-                      $"Connection Timeout={ConnectionTimeout};TrustServerCertificate=True;";
+        var b = new SqlConnectionStringBuilder
+        {
+            DataSource = server,
+            InitialCatalog = database,
+            ConnectTimeout = ConnectionTimeout,
+            TrustServerCertificate = TrustServerCertificate,
+            Encrypt = Encrypt ? SqlConnectionEncryptOption.Mandatory : SqlConnectionEncryptOption.Optional
+        };
 
         if (AuthMode == SqlServerAuthMode.AzureDefault)
         {
             // DefaultAzureCredential chain: env vars, managed identity, VS, VS Code, az CLI, etc.
             // Encryption is required for Azure SQL.
-            return baseStr + "Authentication=Active Directory Default;Encrypt=True;";
+            b.Authentication = SqlAuthenticationMethod.ActiveDirectoryDefault;
+            b.Encrypt = SqlConnectionEncryptOption.Mandatory;
+        }
+        else
+        {
+            b.UserID = User;
+            b.Password = Password;
         }
 
-        return baseStr +
-               $"User ID={User};Password={Password};" +
-               (Encrypted ? "Encrypt=True;" : "");
+        return b.ConnectionString;
+    }
+
+    public override ValueTask DisposeAsync()
+    {
+        if (_lastConnectionString != null)
+        {
+            try { SqlConnection.ClearPool(new SqlConnection(_lastConnectionString)); } catch { /* best effort */ }
+        }
+        return base.DisposeAsync();
     }
 }
 

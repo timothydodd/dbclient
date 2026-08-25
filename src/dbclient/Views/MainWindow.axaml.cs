@@ -3,7 +3,9 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
+using dbclient.Services;
 using dbclient.ViewModels;
 
 namespace dbclient.Views;
@@ -19,14 +21,29 @@ public partial class MainWindow : Window
     private int _currentDropIndex;
     private const double DragThreshold = 8;
 
+    public RelayCommand FocusTreeFilterCommand { get; }
+    public RelayCommand ToggleResultsFilterCommand { get; }
+    public RelayCommand ShowShortcutsCommand { get; }
+
+    private bool _geometryRestored;
+
     public MainWindow()
     {
         InitializeComponent();
+
+        FocusTreeFilterCommand = new RelayCommand(FocusTreeFilter);
+        ToggleResultsFilterCommand = new RelayCommand(ToggleResultsFilter);
+        ShowShortcutsCommand = new RelayCommand(() => _ = ShowAboutAsync(showShortcuts: true));
 
         DataContextChanged += (_, _) =>
         {
             if (DataContext is MainWindowViewModel vm)
             {
+                // ViewModels never touch Windows: install the UI-side handlers they call out to.
+                vm.ConfirmHandler = (title, msg) => ConfirmDialog.ShowAsync(this, title, msg, "Close");
+                vm.PickOpenFileHandler = PickOpenFileAsync;
+                vm.PickSaveFileHandler = PickSaveFileAsync;
+
                 vm.PropertyChanged += (_, e) =>
                 {
                     if (e.PropertyName == nameof(MainWindowViewModel.IsConnectionPanelOpen))
@@ -36,9 +53,187 @@ public partial class MainWindow : Window
                 };
                 UpdateConnectionPanel(vm.IsConnectionPanelOpen);
                 UpdateHistoryPanel(vm.IsHistoryPanelOpen);
+                RestoreGeometry(vm);
+            }
+        };
+
+        Opened += (_, _) =>
+        {
+            // Splitter ratios need the layout to exist; apply once after the first show.
+            if (ViewModel is { } vm) RestoreSplitters(vm);
+        };
+
+        Closing += (_, _) =>
+        {
+            try
+            {
+                if (ViewModel is { } vm)
+                {
+                    CaptureGeometry(vm);
+                    vm.SaveState();
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("Failed to save window state on close", ex);
             }
         };
     }
+
+    #region Window geometry
+
+    private void RestoreGeometry(MainWindowViewModel vm)
+    {
+        if (_geometryRestored) return;
+        _geometryRestored = true;
+
+        try
+        {
+            if (vm.WindowWidth is > 200 && vm.WindowHeight is > 150)
+            {
+                Width = vm.WindowWidth.Value;
+                Height = vm.WindowHeight.Value;
+            }
+
+            if (vm.WindowX.HasValue && vm.WindowY.HasValue)
+            {
+                var pos = new PixelPoint(vm.WindowX.Value, vm.WindowY.Value);
+                // Only honor the saved position when it lands on a currently-attached screen;
+                // otherwise (monitor unplugged etc.) fall back to centering.
+                var onScreen = Screens.All.Any(sc =>
+                    sc.WorkingArea.Contains(pos + new PixelVector(40, 20)));
+                if (onScreen)
+                {
+                    WindowStartupLocation = WindowStartupLocation.Manual;
+                    Position = pos;
+                }
+            }
+
+            if (vm.WindowMaximized)
+                WindowState = WindowState.Maximized;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to restore window geometry", ex);
+        }
+    }
+
+    private void RestoreSplitters(MainWindowViewModel vm)
+    {
+        try
+        {
+            if (vm.LeftPanelWidth is > 100 && vm.IsConnectionPanelOpen)
+                MainGrid.ColumnDefinitions[0].Width = new GridLength(vm.LeftPanelWidth.Value);
+
+            if (vm.EditorHeightRatio is > 0.05 and < 0.95)
+            {
+                var r = vm.EditorHeightRatio.Value;
+                EditorResultsGrid.RowDefinitions[1].Height = new GridLength(r, GridUnitType.Star);
+                EditorResultsGrid.RowDefinitions[3].Height = new GridLength(1 - r, GridUnitType.Star);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to restore splitter sizes", ex);
+        }
+    }
+
+    /// <summary>Copy the live window/splitter sizes into the view model (persisted by SaveState).</summary>
+    public void CaptureGeometry(MainWindowViewModel vm)
+    {
+        var maximized = WindowState == WindowState.Maximized || WindowState == WindowState.FullScreen;
+        vm.WindowMaximized = maximized;
+        if (!maximized && WindowState != WindowState.Minimized)
+        {
+            vm.WindowWidth = Width;
+            vm.WindowHeight = Height;
+            vm.WindowX = Position.X;
+            vm.WindowY = Position.Y;
+        }
+
+        if (vm.IsConnectionPanelOpen && MainGrid.ColumnDefinitions[0].ActualWidth > 0)
+            vm.LeftPanelWidth = MainGrid.ColumnDefinitions[0].ActualWidth;
+
+        var editorH = EditorResultsGrid.RowDefinitions[1].ActualHeight;
+        var resultsH = EditorResultsGrid.RowDefinitions[3].ActualHeight;
+        if (editorH + resultsH > 0)
+            vm.EditorHeightRatio = editorH / (editorH + resultsH);
+    }
+
+    #endregion
+
+    #region File pickers / dialogs
+
+    private static readonly FilePickerFileType SqlFileType = new("SQL files") { Patterns = ["*.sql"] };
+    private static readonly FilePickerFileType AllFileType = new("All files") { Patterns = ["*"] };
+
+    private async Task<string?> PickOpenFileAsync()
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Open SQL file",
+            AllowMultiple = false,
+            FileTypeFilter = [SqlFileType, AllFileType]
+        });
+        return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+    }
+
+    private async Task<string?> PickSaveFileAsync(string suggestedName)
+    {
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save SQL file",
+            SuggestedFileName = suggestedName,
+            DefaultExtension = "sql",
+            ShowOverwritePrompt = true,
+            FileTypeChoices = [SqlFileType, AllFileType]
+        });
+        return file?.TryGetLocalPath();
+    }
+
+    private async Task ShowAboutAsync(bool showShortcuts)
+    {
+        try { await AboutDialog.ShowAsync(this, showShortcuts); }
+        catch (Exception ex) { AppLogger.Error("About dialog failed", ex); }
+    }
+
+    private void About_Click(object? sender, RoutedEventArgs e) => _ = ShowAboutAsync(showShortcuts: false);
+    private void Shortcuts_Click(object? sender, RoutedEventArgs e) => _ = ShowAboutAsync(showShortcuts: true);
+    private void OpenLogFolder_Click(object? sender, RoutedEventArgs e) => AboutDialog.OpenExternal(AppLogger.LogDirectory);
+    private void OpenRepo_Click(object? sender, RoutedEventArgs e) => AboutDialog.OpenExternal(AboutDialog.RepoUrl);
+
+    /// <summary>Ctrl+Shift+E: open the connection panel if needed and focus the schema tree filter box.</summary>
+    private void FocusTreeFilter()
+    {
+        if (ViewModel is { } vm && !vm.IsConnectionPanelOpen)
+            vm.IsConnectionPanelOpen = true;
+        var box = ConnectionPanelControl.FindControl<TextBox>("FilterBox");
+        box?.Focus();
+        box?.SelectAll();
+    }
+
+    /// <summary>Ctrl+Shift+R: show the results filter bar and focus its search box.</summary>
+    private void ToggleResultsFilter()
+    {
+        var results = this.GetVisualDescendants().OfType<ResultsPanel>().FirstOrDefault();
+        if (results == null) return;
+        var bar = results.FindControl<Border>("SearchBar");
+        var box = results.FindControl<TextBox>("SearchBox");
+        if (bar == null || box == null) return;
+        if (bar.IsVisible && box.IsFocused)
+        {
+            bar.IsVisible = false;
+            return;
+        }
+        bar.IsVisible = true;
+        box.Focus();
+        box.SelectAll();
+    }
+
+    private void FocusTreeFilter_Click(object? sender, RoutedEventArgs e) => FocusTreeFilter();
+    private void ToggleResultsFilter_Click(object? sender, RoutedEventArgs e) => ToggleResultsFilter();
+
+    #endregion
 
     private MainWindowViewModel? ViewModel => DataContext as MainWindowViewModel;
 
@@ -84,28 +279,35 @@ public partial class MainWindow : Window
 
     #region Tab Context Menu
 
+    private static async void FireAndForget(Task? task)
+    {
+        if (task == null) return;
+        try { await task; }
+        catch (Exception ex) { AppLogger.Error("Tab operation failed", ex); }
+    }
+
     private void CloseTab_Click(object? sender, RoutedEventArgs e)
     {
         if (sender is MenuItem { Tag: SessionTabViewModel tab })
-            ViewModel?.SelectedConnectionTab?.CloseQueryTab(tab);
+            FireAndForget(ViewModel?.SelectedConnectionTab?.CloseQueryTabAsync(tab));
     }
 
     private void CloseOthers_Click(object? sender, RoutedEventArgs e)
     {
         if (sender is MenuItem { Tag: SessionTabViewModel tab })
-            ViewModel?.SelectedConnectionTab?.CloseOtherQueryTabs(tab);
+            FireAndForget(ViewModel?.SelectedConnectionTab?.CloseOtherQueryTabs(tab));
     }
 
     private void CloseToRight_Click(object? sender, RoutedEventArgs e)
     {
         if (sender is MenuItem { Tag: SessionTabViewModel tab })
-            ViewModel?.SelectedConnectionTab?.CloseQueryTabsToRight(tab);
+            FireAndForget(ViewModel?.SelectedConnectionTab?.CloseQueryTabsToRight(tab));
     }
 
     private void CloseToLeft_Click(object? sender, RoutedEventArgs e)
     {
         if (sender is MenuItem { Tag: SessionTabViewModel tab })
-            ViewModel?.SelectedConnectionTab?.CloseQueryTabsToLeft(tab);
+            FireAndForget(ViewModel?.SelectedConnectionTab?.CloseQueryTabsToLeft(tab));
     }
 
     private void RenameTab_Click(object? sender, RoutedEventArgs e)

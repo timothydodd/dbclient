@@ -19,6 +19,9 @@ public class ConnectionDialogViewModel : ViewModelBase
     private string _sshPassword = "";
     private int _sshRemotePort;
     private string _sshKeyFile = "";
+    private string _sshKeyPassphrase = "";
+    private bool _encrypt = true;
+    private bool _trustServerCertificate;
     private int _connectionTimeout = 15;
     private int _commandTimeout = 30;
     private string _statusMessage = "";
@@ -67,6 +70,9 @@ public class ConnectionDialogViewModel : ViewModelBase
     public string SshPassword { get => _sshPassword; set => SetField(ref _sshPassword, value); }
     public int SshRemotePort { get => _sshRemotePort; set => SetField(ref _sshRemotePort, value); }
     public string SshKeyFile { get => _sshKeyFile; set => SetField(ref _sshKeyFile, value); }
+    public string SshKeyPassphrase { get => _sshKeyPassphrase; set => SetField(ref _sshKeyPassphrase, value); }
+    public bool Encrypt { get => _encrypt; set => SetField(ref _encrypt, value); }
+    public bool TrustServerCertificate { get => _trustServerCertificate; set => SetField(ref _trustServerCertificate, value); }
     public int ConnectionTimeout { get => _connectionTimeout; set => SetField(ref _connectionTimeout, value); }
     public int CommandTimeout { get => _commandTimeout; set => SetField(ref _commandTimeout, value); }
     public string StatusMessage { get => _statusMessage; set => SetField(ref _statusMessage, value); }
@@ -89,6 +95,9 @@ public class ConnectionDialogViewModel : ViewModelBase
         SshPassword = SshPassword,
         SshRemotePort = SshRemotePort,
         SshKeyFile = SshKeyFile,
+        SshKeyPassphrase = SshKeyPassphrase,
+        Encrypt = Encrypt,
+        TrustServerCertificate = TrustServerCertificate,
         ConnectionTimeout = ConnectionTimeout,
         CommandTimeout = CommandTimeout,
     };
@@ -110,6 +119,9 @@ public class ConnectionDialogViewModel : ViewModelBase
         SshPassword = config.SshPassword;
         SshRemotePort = config.SshRemotePort;
         SshKeyFile = config.SshKeyFile;
+        SshKeyPassphrase = config.SshKeyPassphrase;
+        Encrypt = config.Encrypt;
+        TrustServerCertificate = config.TrustServerCertificate;
         ConnectionTimeout = config.ConnectionTimeout;
         CommandTimeout = config.CommandTimeout;
     }

@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"Menu\\\\|ContextMenu\\\\|Command\" /mnt/f/github/dbclient/src/dbclient/Views/*.axaml)",
+      "Bash(dotnet build:*)",
+      "Bash(wc -l /mnt/f/github/dbclient/src/dbclient/Views/*.cs /mnt/f/github/dbclient/src/dbclient/ViewModels/*.cs /mnt/f/github/dbclient/lib/dbclient.Data/Connections/*.cs)",
+      "Bash(dotnet test:*)",
+      "WebSearch",
+      "Read(//home/tim/.nuget/packages/avalonia.themes.fluent/**)",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/AvaloniaUI/Avalonia/master/src/Avalonia.Themes.Fluent/Controls/ScrollBar.xaml\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/AvaloniaUI/Avalonia/master/src/Avalonia.Themes.Fluent/Accents/FluentControlResourcesDark.xaml\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/AvaloniaUI/Avalonia/master/src/Avalonia.Themes.Fluent/Accents/FluentControlResourcesBase.xaml\")",
+      "Bash(curl -sL \"https://api.github.com/search/code?q=VerticalSmallScrollThumbScaleTransform+repo:AvaloniaUI/Avalonia\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(item['path']\\) for item in data.get\\('items',[]\\)]\")",
+      "Bash(curl -sL \"https://api.github.com/repos/AvaloniaUI/Avalonia/git/trees/master?recursive=1\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(item['path']\\) for item in data.get\\('tree',[]\\) if 'Fluent' in item['path'] and item['path'].endswith\\('.xaml'\\)]\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/AvaloniaUI/Avalonia/master/src/Avalonia.Themes.Fluent/Accents/FluentControlResources.xaml\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/AvaloniaUI/Avalonia/master/src/Avalonia.Themes.Fluent/Accents/BaseResources.xaml\")",
+      "Read(//tmp/**)",
+      "Bash(unzip -o /home/tim/.nuget/packages/avalonia.controls.datagrid/11.3.11/avalonia.controls.datagrid.11.3.11.nupkg -d datagrid_nupkg)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl:*)",
+      "Bash(dotnet clean:*)",
+      "Bash(tar -tzf ~/.nuget/packages/avalonia.themes.fluent/11.3.11/avalonia.themes.fluent.11.3.11.nupkg)"
+    ]
+  }
+}

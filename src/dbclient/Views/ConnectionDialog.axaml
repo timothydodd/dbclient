@@ -5,7 +5,7 @@
         x:DataType="vm:ConnectionDialogViewModel"
         Title="New Connection"
         Width="480"
-        Height="560"
+        Height="640"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         CanResize="False"
@@ -113,7 +113,29 @@
 
                     <StackPanel Spacing="4" IsVisible="{Binding ShowSqlLoginFields}">
                         <TextBlock Text="Password" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
-                        <TextBox Text="{Binding Password}" PasswordChar="*"/>
+                        <DockPanel>
+                            <ToggleButton DockPanel.Dock="Right" Click="RevealPassword_Click" Tag="PasswordBox"
+                                          Classes="eye" Margin="4,0,0,0" Padding="6,0" Width="30"
+                                          Background="Transparent" BorderThickness="0"
+                                          ToolTip.Tip="Show / hide">
+                                <Panel>
+                                    <Path IsVisible="{Binding !$parent[ToggleButton].IsChecked}"
+                                          Data="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0 M9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0"
+                                          Stroke="{DynamicResource SecondaryText}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="14" Height="14"/>
+                                    <Path IsVisible="{Binding $parent[ToggleButton].IsChecked}"
+                                          Data="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49 M14.084 14.158a3 3 0 0 1-4.242-4.242 M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143 M2 2l20 20"
+                                          Stroke="{DynamicResource SecondaryText}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="14" Height="14"/>
+                                </Panel>
+                            </ToggleButton>
+                            <TextBox x:Name="PasswordBox" Text="{Binding Password}" PasswordChar="*"/>
+                        </DockPanel>
+                    </StackPanel>
+
+                    <StackPanel Spacing="6" IsVisible="{Binding IsSqlServer}">
+                        <CheckBox Content="Encrypt connection" IsChecked="{Binding Encrypt}"/>
+                        <CheckBox Content="Trust server certificate" IsChecked="{Binding TrustServerCertificate}"/>
+                        <TextBlock Text="Trust server certificate skips TLS certificate validation &#8212; only for self-signed dev servers."
+                                   FontSize="10" Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" Margin="26,-4,0,0"/>
                     </StackPanel>
 
                     <StackPanel Spacing="4">
@@ -159,9 +181,50 @@
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="4">
                                 <TextBlock Text="SSH Password" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
-                                <TextBox Text="{Binding SshPassword}" PasswordChar="*"/>
+                                <DockPanel>
+                                    <ToggleButton DockPanel.Dock="Right" Click="RevealPassword_Click" Tag="SshPasswordBox"
+                                                  Classes="eye" Margin="4,0,0,0" Padding="6,0" Width="30"
+                                                  Background="Transparent" BorderThickness="0"
+                                                  ToolTip.Tip="Show / hide">
+                                        <Panel>
+                                            <Path IsVisible="{Binding !$parent[ToggleButton].IsChecked}"
+                                                  Data="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0 M9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0"
+                                                  Stroke="{DynamicResource SecondaryText}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="14" Height="14"/>
+                                            <Path IsVisible="{Binding $parent[ToggleButton].IsChecked}"
+                                                  Data="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49 M14.084 14.158a3 3 0 0 1-4.242-4.242 M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143 M2 2l20 20"
+                                                  Stroke="{DynamicResource SecondaryText}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="14" Height="14"/>
+                                        </Panel>
+                                    </ToggleButton>
+                                    <TextBox x:Name="SshPasswordBox" Text="{Binding SshPassword}" PasswordChar="*"/>
+                                </DockPanel>
                             </StackPanel>
                         </Grid>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="SSH Private Key File (optional)" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Browse..." Click="BrowseSshKey_Click" Margin="8,0,0,0"/>
+                                <TextBox Text="{Binding SshKeyFile}" Watermark="~/.ssh/id_ed25519"/>
+                            </DockPanel>
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="SSH Key Passphrase (optional)" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
+                            <DockPanel>
+                                <ToggleButton DockPanel.Dock="Right" Click="RevealPassword_Click" Tag="SshKeyPassphraseBox"
+                                              Classes="eye" Margin="4,0,0,0" Padding="6,0" Width="30"
+                                              Background="Transparent" BorderThickness="0"
+                                              ToolTip.Tip="Show / hide">
+                                    <Panel>
+                                        <Path IsVisible="{Binding !$parent[ToggleButton].IsChecked}"
+                                              Data="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0 M9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0"
+                                              Stroke="{DynamicResource SecondaryText}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="14" Height="14"/>
+                                        <Path IsVisible="{Binding $parent[ToggleButton].IsChecked}"
+                                              Data="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49 M14.084 14.158a3 3 0 0 1-4.242-4.242 M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143 M2 2l20 20"
+                                              Stroke="{DynamicResource SecondaryText}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="14" Height="14"/>
+                                    </Panel>
+                                </ToggleButton>
+                                <TextBox x:Name="SshKeyPassphraseBox" Text="{Binding SshKeyPassphrase}" PasswordChar="*"/>
+                            </DockPanel>
+                        </StackPanel>
                         <StackPanel Spacing="4">
                             <TextBlock Text="Remote Port" FontSize="11" Foreground="{DynamicResource SecondaryText}"/>
                             <TextBox Text="{Binding SshRemotePort}"/>
@@ -173,6 +236,9 @@
     </DockPanel>
 
     <Window.Styles>
+        <Style Selector="ToggleButton.eye:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
         <Style Selector="Button.close:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="#ff5555"/>
         </Style>

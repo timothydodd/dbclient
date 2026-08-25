@@ -1,6 +1,7 @@
 using System.Data;
-using System.Data.SQLite;
+using Microsoft.Data.Sqlite;
 using dbclient.Data.Models;
+using MsSqliteConnection = Microsoft.Data.Sqlite.SqliteConnection;
 
 namespace dbclient.Data.Connections;
 
@@ -11,10 +12,25 @@ public class SqliteDbConnection : ConnectionBase
     public override string Name => Path.GetFileName(FileName);
     public override string ConnectionType => "SQLite";
 
+    private string BuildConnectionString() => new SqliteConnectionStringBuilder
+    {
+        DataSource = FileName,
+        Mode = SqliteOpenMode.ReadWriteCreate,
+        DefaultTimeout = CommandTimeout
+    }.ConnectionString;
+
     public override async Task<IDbConnection> GetConnectionAsync(string database, CancellationToken ct = default)
     {
-        var connection = new SQLiteConnection($"Data Source={FileName};Version=3;");
-        await connection.OpenAsync(ct);
+        var connection = new MsSqliteConnection(BuildConnectionString());
+        try
+        {
+            await connection.OpenAsync(ct);
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
         return connection;
     }
 
@@ -29,21 +45,26 @@ public class SqliteDbConnection : ConnectionBase
     {
         var database = new DbDatabase { Name = databaseName };
 
-        using var con = (SQLiteConnection)await GetConnectionAsync(databaseName, ct);
+        using var con = (MsSqliteConnection)await GetConnectionAsync(databaseName, ct);
 
         // Get all tables and views from sqlite_master
-        using var cmd = new SQLiteCommand(
-            "SELECT name, type FROM sqlite_master WHERE type IN ('table','view') ORDER BY type DESC, name ASC;",
-            con);
+        using var cmd = con.CreateCommand();
+        cmd.CommandText = "SELECT name, type FROM sqlite_master WHERE type IN ('table','view') ORDER BY type DESC, name ASC;";
+        cmd.CommandTimeout = CommandTimeout;
         using var masterReader = await cmd.ExecuteReaderAsync(ct);
 
+        var entries = new List<(string Name, string Type)>();
         while (await masterReader.ReadAsync(ct))
         {
             var name = masterReader["name"]?.ToString() ?? "";
             var type = masterReader["type"]?.ToString() ?? "";
-
             if (name.StartsWith("sqlite_")) continue; // Skip internal tables
+            entries.Add((name, type));
+        }
+        await masterReader.DisposeAsync();
 
+        foreach (var (name, type) in entries)
+        {
             if (type == "view")
             {
                 var view = new DbView { Name = name };
@@ -62,10 +83,11 @@ public class SqliteDbConnection : ConnectionBase
         return database;
     }
 
-    private static async Task LoadColumnsAsync(SQLiteConnection con, string tableName, List<DbColumn> columns, CancellationToken ct)
+    private async Task LoadColumnsAsync(MsSqliteConnection con, string tableName, List<DbColumn> columns, CancellationToken ct)
     {
-        var safeTableName = tableName.Replace("\"", "\"\"");
-        using var cmd = new SQLiteCommand($"PRAGMA table_info(\"{safeTableName}\")", con);
+        using var cmd = con.CreateCommand();
+        cmd.CommandText = $"PRAGMA table_info({SqlIdentifier.Quote(SqlDialect.Sqlite, tableName)})";
+        cmd.CommandTimeout = CommandTimeout;
         using var reader = await cmd.ExecuteReaderAsync(ct);
 
         while (await reader.ReadAsync(ct))
@@ -88,43 +110,28 @@ public class SqliteDbConnection : ConnectionBase
 
         try
         {
-            using var con = new SQLiteConnection($"Data Source={FileName};Version=3;");
-            await con.OpenAsync(ct);
+            using var con = (MsSqliteConnection)await GetConnectionAsync(database, ct);
 
-            using var cmd = new SQLiteCommand(sql, con);
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = sql;
             cmd.CommandTimeout = CommandTimeout;
 
-            if (ct != default)
-                ct.Register(() => cmd.Cancel());
-
+            // Microsoft.Data.Sqlite has no meaningful Command.Cancel; cancellation is honoured
+            // between rows via the token passed to ReadAsync/NextResultAsync.
+            result.Data = new List<ResultSet>();
             using var reader = await cmd.ExecuteReaderAsync(ct);
-
-            var rs = new Data.Models.ResultSet();
-
-            if (reader.FieldCount > 0)
+            do
             {
-                rs.ColumnNames = new string[reader.FieldCount];
-                rs.ColumnTypes = new string?[reader.FieldCount];
+                if (reader.FieldCount == 0) continue;
 
-                for (int i = 0; i < reader.FieldCount; i++)
-                {
-                    rs.ColumnNames[i] = reader.GetName(i);
-                    rs.ColumnTypes[i] = reader.GetDataTypeName(i);
-                }
+                var rs = ReadColumns(reader);
+                await ReadRowsAsync(reader, rs, MaxRows, ct);
+                result.Data.Add(rs);
+            } while (await reader.NextResultAsync(ct));
 
-                while (await reader.ReadAsync(ct))
-                {
-                    if (MaxRows > 0 && rs.Rows.Count >= MaxRows) break;
-
-                    var values = new string?[reader.FieldCount];
-                    for (int i = 0; i < reader.FieldCount; i++)
-                        values[i] = reader.IsDBNull(i) ? null : reader.GetValue(i)?.ToString();
-                    rs.Rows.Add(values);
-                }
-            }
-
-            result.AffectedRows = rs.Rows.Count;
-            result.Data = [rs];
+            result.AffectedRows = result.Data.Count > 0
+                ? result.Data.Sum(d => d.Rows.Count)
+                : Math.Max(reader.RecordsAffected, 0);
         }
         catch (Exception ex)
         {

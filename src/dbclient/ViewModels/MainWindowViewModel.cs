@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Avalonia.Media;
+using Avalonia.Threading;
 using dbclient.Models;
 using dbclient.Services;
 
@@ -13,12 +14,30 @@ public class MainWindowViewModel : ViewModelBase
     private string _themeName = "Dark";
     private int _cursorLine = 1;
     private int _cursorColumn = 1;
+    private int _maxRows = 100_000;
+    private double _editorFontSize = 14;
+    private bool _editorWordWrap;
     private readonly StateService _stateService = new();
     private readonly QueryHistoryService _historyService = new();
-private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
+    private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
+    private readonly DispatcherTimer _autosaveTimer;
+    private bool _isShuttingDown;
+
+    public const double MinFontSize = 8;
+    public const double MaxFontSize = 40;
+    public const double DefaultFontSize = 14;
 
     public ObservableCollection<ConnectionTabViewModel> ConnectionTabs { get; } = new();
     public ObservableCollection<ConnectionConfig> SavedConnections { get; } = new();
+
+    // ---- Handlers the window installs (ViewModels never reference Window directly) ----
+
+    /// <summary>Show a confirm dialog: (title, message) => true when the user accepted.</summary>
+    public Func<string, string, Task<bool>>? ConfirmHandler { get; set; }
+    /// <summary>Show an open-file picker for *.sql; returns the chosen path or null.</summary>
+    public Func<Task<string?>>? PickOpenFileHandler { get; set; }
+    /// <summary>Show a save-file picker for *.sql (suggested name) ; returns the chosen path or null.</summary>
+    public Func<string, Task<string?>>? PickSaveFileHandler { get; set; }
 
     public RelayCommand NewQueryTabCommand { get; }
     public RelayCommand CloseQueryTabCommand { get; }
@@ -26,16 +45,33 @@ private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
     public RelayCommand CancelQueryCommand { get; }
     public RelayCommand FormatQueryCommand { get; }
     public RelayCommand ExplainQueryCommand { get; }
+    /// <summary>Save workspace/app state now (state also autosaves).</summary>
     public RelayCommand SaveCommand { get; }
+    public RelayCommand OpenFileCommand { get; }
+    public RelayCommand SaveFileCommand { get; }
+    public RelayCommand SaveFileAsCommand { get; }
     public RelayCommand ToggleConnectionPanelCommand { get; }
     public RelayCommand ToggleHistoryPanelCommand { get; }
     public RelayCommand ToggleThemeCommand { get; }
+    public RelayCommand ToggleWordWrapCommand { get; }
+    public RelayCommand ZoomInCommand { get; }
+    public RelayCommand ZoomOutCommand { get; }
+    public RelayCommand ZoomResetCommand { get; }
+    public RelayCommand ToggleCommentCommand { get; }
+    public RelayCommand NextQueryTabCommand { get; }
+    public RelayCommand PrevQueryTabCommand { get; }
+    public RelayCommand SetRowLimitCommand { get; }
+    public RelayCommand CloseConnectionTabCommand { get; }
 
     public MainWindowViewModel()
     {
         NewQueryTabCommand = new RelayCommand(() => SelectedConnectionTab?.NewQueryTab());
-        CloseQueryTabCommand = new RelayCommand(p => SelectedConnectionTab?.CloseQueryTab(p as SessionTabViewModel));
+        CloseQueryTabCommand = new RelayCommand(p => _ = SafeFireAndForget(SelectedConnectionTab?.CloseQueryTabAsync(p as SessionTabViewModel)));
+        CloseConnectionTabCommand = new RelayCommand(p => _ = SafeFireAndForget(CloseConnectionTabAsync(p as ConnectionTabViewModel)));
         SaveCommand = new RelayCommand(SaveState);
+        OpenFileCommand = new RelayCommand(() => _ = SafeFireAndForget(OpenFileAsync()));
+        SaveFileCommand = new RelayCommand(() => _ = SafeFireAndForget(SaveFileAsync(saveAs: false)));
+        SaveFileAsCommand = new RelayCommand(() => _ = SafeFireAndForget(SaveFileAsync(saveAs: true)));
         ExecuteQueryCommand = new RelayCommand(() => _ = SafeFireAndForget(ExecuteAsync()));
         CancelQueryCommand = new RelayCommand(() => SelectedConnectionTab?.SelectedQueryTab?.ExecutionCts?.Cancel());
         FormatQueryCommand = new RelayCommand(FormatCurrentQuery);
@@ -43,6 +79,26 @@ private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
         ToggleConnectionPanelCommand = new RelayCommand(() => IsConnectionPanelOpen = !IsConnectionPanelOpen);
         ToggleHistoryPanelCommand = new RelayCommand(() => IsHistoryPanelOpen = !IsHistoryPanelOpen);
         ToggleThemeCommand = new RelayCommand(ToggleTheme);
+        ToggleWordWrapCommand = new RelayCommand(() => EditorWordWrap = !EditorWordWrap);
+        ZoomInCommand = new RelayCommand(() => EditorFontSize += 1);
+        ZoomOutCommand = new RelayCommand(() => EditorFontSize -= 1);
+        ZoomResetCommand = new RelayCommand(() => EditorFontSize = DefaultFontSize);
+        ToggleCommentCommand = new RelayCommand(() => SelectedConnectionTab?.SelectedQueryTab?.RequestEditorAction("ToggleComment"));
+        NextQueryTabCommand = new RelayCommand(() => SelectedConnectionTab?.SelectNextQueryTab(+1));
+        PrevQueryTabCommand = new RelayCommand(() => SelectedConnectionTab?.SelectNextQueryTab(-1));
+        SetRowLimitCommand = new RelayCommand(p =>
+        {
+            if (p is int i) MaxRows = i;
+            else if (p is string str && int.TryParse(str, out var parsed)) MaxRows = parsed;
+        });
+
+        // One app-wide autosave timer: restarted on every query-text change, fires once 3s after the last edit.
+        _autosaveTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _autosaveTimer.Tick += (_, _) =>
+        {
+            _autosaveTimer.Stop();
+            SaveState();
+        };
 
         LoadState();
     }
@@ -126,6 +182,66 @@ private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
         App.Instance?.SetTheme(ThemeName);
     }
 
+    // ---- Editor settings (persisted) ----
+
+    public double EditorFontSize
+    {
+        get => _editorFontSize;
+        set
+        {
+            var clamped = Math.Clamp(value, MinFontSize, MaxFontSize);
+            if (SetField(ref _editorFontSize, clamped))
+                ScheduleAutosave();
+        }
+    }
+
+    public bool EditorWordWrap
+    {
+        get => _editorWordWrap;
+        set
+        {
+            if (SetField(ref _editorWordWrap, value))
+                ScheduleAutosave();
+        }
+    }
+
+    // ---- Row limit ----
+
+    /// <summary>Row cap applied to every connection (0 = unlimited).</summary>
+    public int MaxRows
+    {
+        get => _maxRows;
+        set
+        {
+            if (value < 0) value = 0;
+            if (!SetField(ref _maxRows, value)) return;
+            foreach (var ct in ConnectionTabs)
+                ct.MaxRows = value;
+            OnPropertyChanged(nameof(IsRowLimit1K));
+            OnPropertyChanged(nameof(IsRowLimit10K));
+            OnPropertyChanged(nameof(IsRowLimit100K));
+            OnPropertyChanged(nameof(IsRowLimitUnlimited));
+            OnPropertyChanged(nameof(RowLimitDisplay));
+            ScheduleAutosave();
+        }
+    }
+
+    public bool IsRowLimit1K => _maxRows == 1_000;
+    public bool IsRowLimit10K => _maxRows == 10_000;
+    public bool IsRowLimit100K => _maxRows == 100_000;
+    public bool IsRowLimitUnlimited => _maxRows == 0;
+    public string RowLimitDisplay => _maxRows == 0 ? "Row limit: Unlimited" : $"Row limit: {_maxRows:N0}";
+
+    // ---- Window geometry (set by MainWindow, persisted in SaveState) ----
+
+    public double? WindowWidth { get; set; }
+    public double? WindowHeight { get; set; }
+    public int? WindowX { get; set; }
+    public int? WindowY { get; set; }
+    public bool WindowMaximized { get; set; }
+    public double? LeftPanelWidth { get; set; }
+    public double? EditorHeightRatio { get; set; }
+
     public string StatusText => SelectedConnectionTab?.StatusText ?? "No connection";
     public object? HistoryChanged => null; // notification-only property
     public string ExecutionTimeText => SelectedConnectionTab?.ExecutionTimeText ?? "";
@@ -184,10 +300,23 @@ private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
         return connTab;
     }
 
-    public void CloseConnectionTab(ConnectionTabViewModel? tab)
+    /// <summary>Synchronous wrapper kept for existing callers (ConnectionPanel). Prompts, cancels, disposes.</summary>
+    public void CloseConnectionTab(ConnectionTabViewModel? tab) => _ = SafeFireAndForget(CloseConnectionTabAsync(tab));
+
+    public async Task CloseConnectionTabAsync(ConnectionTabViewModel? tab)
     {
         tab ??= SelectedConnectionTab;
         if (tab == null) return;
+
+        // Prompt once if any open tab has something worth keeping.
+        var dirty = tab.AllTabs().Where(t => t.ShouldConfirmClose).ToList();
+        if (dirty.Count > 0 && ConfirmHandler != null)
+        {
+            var msg = dirty.Count == 1
+                ? $"Close '{tab.DisplayName}'? Unsaved query in '{dirty[0].Title}' will be lost."
+                : $"Close '{tab.DisplayName}'? Unsaved queries in {dirty.Count} tabs will be lost.";
+            if (!await ConfirmHandler("Close Connection", msg)) return;
+        }
 
         // Save this connection's session state before closing
         SaveConnectionState(tab);
@@ -196,12 +325,47 @@ private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
         ConnectionTabs.Remove(tab);
 
         if (ConnectionTabs.Count > 0)
-            SelectedConnectionTab = ConnectionTabs[Math.Min(index, ConnectionTabs.Count - 1)];
+            SelectedConnectionTab = ConnectionTabs[Math.Min(Math.Max(index, 0), ConnectionTabs.Count - 1)];
         else
             SelectedConnectionTab = null;
 
-        _ = tab.Connection?.DisposeAsync();
         SaveState();
+        await TeardownConnectionAsync(tab);
+    }
+
+    private static async Task TeardownConnectionAsync(ConnectionTabViewModel tab)
+    {
+        tab.CancelAllQueries();
+        try
+        {
+            if (tab.Connection != null)
+                await tab.Connection.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error($"Failed to dispose connection {tab.DisplayName}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Cancel every running query and dispose every connection, in parallel, each guarded.
+    /// Called by App on shutdown after the final SaveState.
+    /// </summary>
+    public async Task ShutdownAsync()
+    {
+        if (_isShuttingDown) return;
+        _isShuttingDown = true;
+        _autosaveTimer.Stop();
+
+        var tabs = ConnectionTabs.ToList();
+        try
+        {
+            await Task.WhenAll(tabs.Select(TeardownConnectionAsync));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Shutdown teardown failed", ex);
+        }
     }
 
     public void DeleteSavedConnection(ConnectionConfig config)
@@ -213,27 +377,41 @@ private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
 
     private void SetupConnectionTabListeners(ConnectionTabViewModel connTab)
     {
-        // Forward cursor position from the active query tab
+        connTab.ConfirmHandler = (title, msg) => ConfirmHandler?.Invoke(title, msg) ?? Task.FromResult(true);
+        connTab.MaxRows = MaxRows;
+        connTab.TabTextChanged += (_, _) => ScheduleAutosave();
+
+        // Forward cursor position from the active query tab. Keep a single handler on the
+        // currently-selected query tab and unsubscribe it when the selection moves on.
+        SessionTabViewModel? watched = null;
+        System.ComponentModel.PropertyChangedEventHandler cursorHandler = (_, qe) =>
+        {
+            if (connTab != SelectedConnectionTab || watched == null || watched != connTab.SelectedQueryTab) return;
+            if (qe.PropertyName == nameof(SessionTabViewModel.CursorLine))
+                CursorLine = watched.CursorLine;
+            else if (qe.PropertyName == nameof(SessionTabViewModel.CursorColumn))
+                CursorColumn = watched.CursorColumn;
+        };
+
+        void Watch(SessionTabViewModel? qt)
+        {
+            if (watched != null) watched.PropertyChanged -= cursorHandler;
+            watched = qt;
+            if (qt != null) qt.PropertyChanged += cursorHandler;
+        }
+
+        Watch(connTab.SelectedQueryTab);
+
         connTab.PropertyChanged += (_, e) =>
         {
+            if (e.PropertyName != nameof(ConnectionTabViewModel.SelectedQueryTab)) return;
+            Watch(connTab.SelectedQueryTab);
             if (connTab != SelectedConnectionTab) return;
-            if (e.PropertyName == nameof(ConnectionTabViewModel.SelectedQueryTab))
+            var qt = connTab.SelectedQueryTab;
+            if (qt != null)
             {
-                var qt = connTab.SelectedQueryTab;
-                if (qt != null)
-                {
-                    CursorLine = qt.CursorLine;
-                    CursorColumn = qt.CursorColumn;
-
-                    qt.PropertyChanged += (_, qe) =>
-                    {
-                        if (connTab != SelectedConnectionTab || qt != connTab.SelectedQueryTab) return;
-                        if (qe.PropertyName == nameof(SessionTabViewModel.CursorLine))
-                            CursorLine = qt.CursorLine;
-                        else if (qe.PropertyName == nameof(SessionTabViewModel.CursorColumn))
-                            CursorColumn = qt.CursorColumn;
-                    };
-                }
+                CursorLine = qt.CursorLine;
+                CursorColumn = qt.CursorColumn;
             }
         };
     }
@@ -247,7 +425,7 @@ private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
         }
         catch (Exception ex)
         {
-            Services.AppLogger.Error("Background task failed", ex);
+            AppLogger.Error("Background task failed", ex);
         }
     }
 
@@ -256,6 +434,92 @@ private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
         var tab = SelectedConnectionTab?.SelectedQueryTab;
         if (tab == null || string.IsNullOrWhiteSpace(tab.QueryText)) return;
         tab.SetQueryText(SqlFormatter.Format(tab.QueryText));
+    }
+
+    // ---- .sql file open / save ----
+
+    public async Task OpenFileAsync()
+    {
+        if (PickOpenFileHandler == null) return;
+        var path = await PickOpenFileHandler();
+        if (string.IsNullOrEmpty(path)) return;
+        await OpenFileAsync(path);
+    }
+
+    public async Task OpenFileAsync(string path)
+    {
+        var connTab = SelectedConnectionTab;
+        if (connTab == null)
+        {
+            AppLogger.Warn("Open SQL ignored: no connection tab selected");
+            return;
+        }
+
+        string text;
+        try
+        {
+            text = await File.ReadAllTextAsync(path);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error($"Failed to open {path}", ex);
+            if (connTab.SelectedQueryTab != null)
+            {
+                connTab.SelectedQueryTab.HasMessage = true;
+                connTab.SelectedQueryTab.Message = $"Could not open file: {ex.Message}";
+                connTab.SelectedQueryTab.MessageColor = ThemeColors.Error;
+            }
+            return;
+        }
+
+        // Already open? Just switch to it.
+        var open = connTab.QueryTabs.FirstOrDefault(t =>
+            t.FilePath != null && string.Equals(Path.GetFullPath(t.FilePath), Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase));
+        if (open != null)
+        {
+            connTab.SelectedQueryTab = open;
+            return;
+        }
+
+        // Reuse the current tab if it's an empty scratch tab, otherwise open a new one.
+        var target = connTab.SelectedQueryTab;
+        if (target == null || target.IsFileBacked || !string.IsNullOrWhiteSpace(target.QueryText))
+            target = connTab.NewQueryTab();
+
+        target.SetQueryText(text);          // syncs the editor
+        target.MarkSavedToFile(path, text); // records disk text so IsDirty is false
+        SaveState();
+    }
+
+    public async Task SaveFileAsync(bool saveAs)
+    {
+        var tab = SelectedConnectionTab?.SelectedQueryTab;
+        if (tab == null) return;
+
+        var path = tab.FilePath;
+        if (saveAs || string.IsNullOrEmpty(path))
+        {
+            if (PickSaveFileHandler == null) return;
+            var suggested = tab.IsFileBacked ? Path.GetFileName(tab.FilePath!) : $"{tab.Title}.sql";
+            path = await PickSaveFileHandler(suggested);
+            if (string.IsNullOrEmpty(path)) return;
+        }
+
+        try
+        {
+            var text = tab.QueryText;
+            await File.WriteAllTextAsync(path, text);
+            tab.MarkSavedToFile(path, text);
+            tab.StatusText = $"Saved {Path.GetFileName(path)}";
+            SaveState();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error($"Failed to save {path}", ex);
+            tab.HasMessage = true;
+            tab.Message = $"Could not save file: {ex.Message}";
+            tab.MessageColor = ThemeColors.Error;
+        }
     }
 
     public List<QueryHistoryEntry> GetHistory() => _historyService.Load();
@@ -268,19 +532,21 @@ private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
 
     private async Task ExecuteAsync()
     {
-        if (SelectedConnectionTab == null) return;
+        // Capture the connection tab: the user may switch connections while the query runs.
+        var connTab = SelectedConnectionTab;
+        if (connTab == null) return;
 
-        var queryText = SelectedConnectionTab.SelectedQueryTab?.QueryText;
-        await SelectedConnectionTab.ExecuteQueryAsync();
+        var queryText = connTab.SelectedQueryTab?.QueryText;
+        await connTab.ExecuteQueryAsync();
 
         if (!string.IsNullOrWhiteSpace(queryText))
         {
             _historyService.Add(new QueryHistoryEntry
             {
                 Query = queryText!.Length > 1000 ? queryText[..1000] : queryText!,
-                Database = SelectedConnectionTab.ActiveDatabase,
-                Connection = SelectedConnectionTab.DisplayName,
-                ConnectionId = SelectedConnectionTab.Config.Id,
+                Database = connTab.ActiveDatabase,
+                Connection = connTab.DisplayName,
+                ConnectionId = connTab.Config.Id,
                 ExecutedAt = DateTime.Now
             });
             OnPropertyChanged(nameof(HistoryChanged));
@@ -320,15 +586,21 @@ private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
             connTab.NewQueryTab();
     }
 
+    /// <summary>Restart the 3s autosave countdown (called on every query-text / setting change).</summary>
+    public void ScheduleAutosave()
+    {
+        if (_isShuttingDown) return;
+        _autosaveTimer.Stop();
+        _autosaveTimer.Start();
+    }
+
     public void SaveState()
     {
+        _autosaveTimer.Stop();
+
         // Save each open connection's session state to its own file
         foreach (var ct in ConnectionTabs)
-        {
             SaveConnectionState(ct);
-            foreach (var qt in ct.AllTabs())
-                qt.IsDirty = false;
-        }
 
         // Save master state (connections list + which tabs are open)
         var state = new AppState
@@ -338,7 +610,17 @@ private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
             IsHistoryPanelOpen = IsHistoryPanelOpen,
             SavedConnections = SavedConnections.ToList(),
             ActiveConnectionTabId = SelectedConnectionTab?.Config.Id,
-            OpenConnectionIds = ConnectionTabs.Select(ct => ct.Config.Id).ToList()
+            OpenConnectionIds = ConnectionTabs.Select(ct => ct.Config.Id).ToList(),
+            MaxRows = MaxRows,
+            EditorFontSize = EditorFontSize,
+            EditorWordWrap = EditorWordWrap,
+            WindowWidth = WindowWidth,
+            WindowHeight = WindowHeight,
+            WindowX = WindowX,
+            WindowY = WindowY,
+            WindowMaximized = WindowMaximized,
+            LeftPanelWidth = LeftPanelWidth,
+            EditorHeightRatio = EditorHeightRatio
         };
 
         _stateService.SaveState(state);
@@ -350,6 +632,16 @@ private System.ComponentModel.PropertyChangedEventHandler? _selectedTabHandler;
         _themeName = state.Theme ?? "Dark";
         IsConnectionPanelOpen = state.IsConnectionPanelOpen;
         IsHistoryPanelOpen = state.IsHistoryPanelOpen;
+        _maxRows = state.MaxRows < 0 ? 0 : state.MaxRows;
+        _editorFontSize = Math.Clamp(state.EditorFontSize <= 0 ? DefaultFontSize : state.EditorFontSize, MinFontSize, MaxFontSize);
+        _editorWordWrap = state.EditorWordWrap;
+        WindowWidth = state.WindowWidth;
+        WindowHeight = state.WindowHeight;
+        WindowX = state.WindowX;
+        WindowY = state.WindowY;
+        WindowMaximized = state.WindowMaximized;
+        LeftPanelWidth = state.LeftPanelWidth;
+        EditorHeightRatio = state.EditorHeightRatio;
 
         foreach (var conn in state.SavedConnections)
             SavedConnections.Add(conn);
@@ -397,6 +689,12 @@ public class ConnectionTreeNode : ViewModelBase
     public string Detail { get; set; }
     public string SchemaName { get; set; }
     public ConnectionTreeNodeType NodeType { get; set; }
+    /// <summary>Column nodes only: set from DbColumn.IsPrimaryKey (structured; don't parse Detail).</summary>
+    public bool IsPrimaryKey { get; set; }
+    /// <summary>Column nodes only: set from DbColumn.IsNullable.</summary>
+    public bool IsNullable { get; set; }
+    /// <summary>Column nodes only: raw data type without PK/NULL tags.</summary>
+    public string DataType { get; set; } = "";
     public ObservableCollection<ConnectionTreeNode> Children { get; } = new();
 
     public bool IsExpanded

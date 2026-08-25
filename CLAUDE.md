@@ -21,9 +21,25 @@ dotnet clean && dotnet build
 
 # Restore packages
 dotnet restore
+
+# Isolated build: redirect outputs to avoid MSB3021 file locks (e.g. when another build/agent holds obj/)
+dotnet build -p:BaseOutputPath=/tmp/out/
 ```
 
 Solution file: `dbclient.slnx`
+
+### Release
+
+```bash
+# Self-contained single-file publish (one of win-x64, linux-x64, osx-x64, osx-arm64)
+dotnet publish src/dbclient/dbclient.csproj -c Release -r win-x64 --self-contained \
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version=0.1.0
+
+# Or via the checked-in profiles in src/dbclient/Properties/PublishProfiles/
+dotnet publish src/dbclient/dbclient.csproj -p:PublishProfile=win-x64
+```
+
+Tagging `v*` triggers `.github/workflows/release.yml` (publishes all four RIDs, uploads unsigned archives to a GitHub Release). Version lives in `src/dbclient/dbclient.csproj` (`<Version>`), `assets/macos/Info.plist`, and `src/dbclient/app.manifest`. Log file: `~/.dbclient/log.txt`.
 
 ## Architecture Overview
 
@@ -104,11 +120,11 @@ dbclient/
 
 ### Technology Stack
 - **.NET 10.0** cross-platform
-- **Avalonia UI 11.3.11** — Cross-platform UI framework
-- **AvaloniaEdit 11.4.0** — Text editor with CompletionWindow, syntax highlighting
-- **Avalonia.Controls.DataGrid 11.3.11** — Results grid
+- **Avalonia UI 12.1.1** — Cross-platform UI framework
+- **AvaloniaEdit 12.0.0** — Text editor with CompletionWindow, syntax highlighting
+- **Avalonia.Controls.DataGrid 12.1.2** — Results grid
 - **Dapper** — Query execution
-- **Microsoft.Data.SqlClient, MySql.Data, System.Data.SQLite.Core** — DB drivers
+- **Microsoft.Data.SqlClient, MySqlConnector, Microsoft.Data.Sqlite** — DB drivers
 - **SSH.NET** — SSH tunnel support
 - **System.Text.Json** — State serialization
 

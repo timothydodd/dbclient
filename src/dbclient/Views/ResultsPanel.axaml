@@ -75,6 +75,47 @@
                 <StackPanel x:Name="ResultSetTabs" Orientation="Horizontal" Spacing="2"/>
             </Border>
 
+            <!-- Truncation banner -->
+            <Border DockPanel.Dock="Top" x:Name="TruncatedBanner"
+                    Background="#33ffb86c"
+                    BorderBrush="{DynamicResource WarningColor}"
+                    BorderThickness="0,0,0,1"
+                    Padding="10,4" IsVisible="False">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Path Data="M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3 M12 9v4 M12 17h.01"
+                          Stroke="{DynamicResource WarningColor}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="12" Height="12"/>
+                    <TextBlock x:Name="TruncatedText" FontSize="11"
+                               Foreground="{DynamicResource WarningColor}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Server messages (PRINT / warnings) — collapsible, hidden when empty -->
+            <Expander DockPanel.Dock="Bottom"
+                      IsVisible="{Binding HasMessages}"
+                      IsExpanded="True"
+                      MaxHeight="160"
+                      Padding="0" Margin="0"
+                      Background="{DynamicResource PanelHeaderBackground}"
+                      BorderThickness="0">
+                <Expander.Header>
+                    <TextBlock Text="Messages" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource PanelHeaderText}" Opacity="0.7"/>
+                </Expander.Header>
+                <ScrollViewer MaxHeight="120">
+                    <TextBox Text="{Binding Messages, Mode=OneWay}"
+                             IsReadOnly="True"
+                             FontSize="12"
+                             FontFamily="Consolas, Menlo, monospace"
+                             Foreground="{DynamicResource SecondaryText}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="10,4"
+                             TextWrapping="Wrap"
+                             AcceptsReturn="True"/>
+                </ScrollViewer>
+            </Expander>
+
             <!-- Messages area -->
             <Border DockPanel.Dock="Bottom"
                     Background="{DynamicResource PanelHeaderBackground}"
@@ -102,7 +143,7 @@
                               Stroke="{DynamicResource SecondaryText}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="8" Height="8"/>
                     </Button>
                     <TextBox x:Name="SearchBox"
-                             Watermark="Filter results..."
+                             Watermark="Filter results... (Ctrl+Shift+R)"
                              FontSize="11" Height="24"
                              BorderThickness="0"
                              Background="Transparent"/>
@@ -126,7 +167,10 @@
                         <MenuItem Header="Copy Row" Click="CopySelected_Click" InputGesture="Ctrl+Shift+C"/>
                         <MenuItem Header="Copy All Rows" Click="CopyAll_Click"/>
                         <Separator/>
+                        <MenuItem Header="Copy as INSERT" Click="CopyAsInsert_Click"/>
+                        <Separator/>
                         <MenuItem Header="Export to CSV..." Click="ExportCsv_Click"/>
+                        <MenuItem Header="Export to JSON..." Click="ExportJson_Click"/>
                     </ContextMenu>
                 </DataGrid.ContextMenu>
                 <DataGrid.Styles>

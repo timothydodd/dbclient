@@ -9,7 +9,6 @@ public class SessionTabViewModel : ViewModelBase
     private string _title = "Query 1";
     private string _queryText = "";
     private string _queryTextToExecute = "";
-    private bool _isDirty;
     private int _cursorLine = 1;
     private int _cursorColumn = 1;
     private string _rowCountText = "";
@@ -19,6 +18,13 @@ public class SessionTabViewModel : ViewModelBase
     private List<ResultSet>? _resultData;
     private int _selectedResultIndex;
     private bool _isExecuting;
+    private string _messages = "";
+    private string _statusText = "";
+    private string _executionTimeText = "";
+    private string? _filePath;
+
+    /// <summary>Text as last read from / written to <see cref="FilePath"/>. Only meaningful when file-backed.</summary>
+    private string _diskText = "";
 
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
 
@@ -27,6 +33,9 @@ public class SessionTabViewModel : ViewModelBase
     public IIntelliSenseProvider? IntelliSenseProvider { get; set; }
 
     public event EventHandler? ExecuteRequested;
+
+    /// <summary>Raised by editor-level commands (toggle comment, etc.) that need the live TextEditor.</summary>
+    public event EventHandler<string>? EditorActionRequested;
 
     public string Title
     {
@@ -40,7 +49,7 @@ public class SessionTabViewModel : ViewModelBase
         set
         {
             if (SetField(ref _queryText, value))
-                IsDirty = true;
+                OnPropertyChanged(nameof(IsDirty));
         }
     }
 
@@ -50,10 +59,54 @@ public class SessionTabViewModel : ViewModelBase
         set => SetField(ref _queryTextToExecute, value);
     }
 
-    public bool IsDirty
+    /// <summary>
+    /// Backing .sql file. When set, the tab title is the file name and <see cref="IsDirty"/>
+    /// reflects whether the editor text differs from what is on disk.
+    /// </summary>
+    public string? FilePath
     {
-        get => _isDirty;
-        set => SetField(ref _isDirty, value);
+        get => _filePath;
+        set
+        {
+            if (SetField(ref _filePath, value))
+            {
+                OnPropertyChanged(nameof(IsFileBacked));
+                OnPropertyChanged(nameof(IsDirty));
+            }
+        }
+    }
+
+    public bool IsFileBacked => !string.IsNullOrEmpty(_filePath);
+
+    /// <summary>
+    /// "Dirty" only has meaning for file-backed tabs: the editor text differs from the file on disk.
+    /// Non-file tabs are autosaved into app state, so they are never shown as dirty.
+    /// </summary>
+    public bool IsDirty => IsFileBacked && !string.Equals(_queryText, _diskText, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Whether closing this tab should prompt the user. File-backed tabs prompt when unsaved;
+    /// scratch tabs prompt whenever they contain any text (it would be lost).
+    /// </summary>
+    public bool ShouldConfirmClose => IsFileBacked ? IsDirty : !string.IsNullOrWhiteSpace(_queryText);
+
+    /// <summary>Record that the current text matches the file at <paramref name="path"/>.</summary>
+    public void MarkSavedToFile(string path, string text)
+    {
+        _diskText = text;
+        _queryText = text;
+        OnPropertyChanged(nameof(QueryText));
+        FilePath = path;
+        Title = Path.GetFileName(path);
+        OnPropertyChanged(nameof(IsDirty));
+    }
+
+    /// <summary>Restore a file-backed tab from state: assume the saved text matched disk at the time.</summary>
+    public void RestoreFileBacking(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        _diskText = _queryText;
+        FilePath = path;
     }
 
     public int CursorLine
@@ -92,6 +145,32 @@ public class SessionTabViewModel : ViewModelBase
         set => SetField(ref _messageColor, value);
     }
 
+    /// <summary>Informational messages from the server (PRINT, warnings), newline-joined. Empty when none.</summary>
+    public string Messages
+    {
+        get => _messages;
+        set
+        {
+            if (SetField(ref _messages, value))
+                OnPropertyChanged(nameof(HasMessages));
+        }
+    }
+
+    public bool HasMessages => !string.IsNullOrEmpty(_messages);
+
+    /// <summary>Per-tab status shown in the status bar while this tab is selected (empty = show connection status).</summary>
+    public string StatusText
+    {
+        get => _statusText;
+        set => SetField(ref _statusText, value);
+    }
+
+    public string ExecutionTimeText
+    {
+        get => _executionTimeText;
+        set => SetField(ref _executionTimeText, value);
+    }
+
     public List<ResultSet>? ResultData
     {
         get => _resultData;
@@ -120,13 +199,13 @@ public class SessionTabViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Set query text without marking the tab as dirty (used for restoring state).
+    /// Set query text without raising QueryText change notifications to the editor (used for restoring state).
     /// </summary>
     public void SetInitialQueryText(string text)
     {
         _queryText = text;
         OnPropertyChanged(nameof(QueryText));
-        IsDirty = false;
+        OnPropertyChanged(nameof(IsDirty));
     }
 
     public event EventHandler<string>? QueryTextSet;
@@ -135,12 +214,17 @@ public class SessionTabViewModel : ViewModelBase
     {
         _queryText = text;
         OnPropertyChanged(nameof(QueryText));
-        IsDirty = true;
+        OnPropertyChanged(nameof(IsDirty));
         QueryTextSet?.Invoke(this, text);
     }
 
     public void RequestExecute()
     {
         ExecuteRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void RequestEditorAction(string action)
+    {
+        EditorActionRequested?.Invoke(this, action);
     }
 }

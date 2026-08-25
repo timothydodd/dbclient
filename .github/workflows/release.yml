@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+          - rid: linux-x64
+            os: ubuntu-latest
+          - rid: osx-x64
+            os: macos-latest
+          - rid: osx-arm64
+            os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Resolve version from tag
+        id: ver
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish
+        shell: bash
+        run: |
+          dotnet publish src/dbclient/dbclient.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:Version=${{ steps.ver.outputs.version }} \
+            -o publish/${{ matrix.rid }}
+
+      # TODO: code signing
+      # - win-x64: sign publish/win-x64/dbclient.exe with signtool (Authenticode cert in
+      #   a secret, e.g. `signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 ...`).
+      # - osx-*: assemble dbclient.app via assets/macos/make-bundle.sh, then
+      #   `codesign --deep --options runtime --sign "Developer ID Application: ..."`,
+      #   `xcrun notarytool submit ... --wait`, and `xcrun stapler staple dbclient.app`.
+      # - linux-x64: optionally sign the tarball with gpg --detach-sign.
+      # Signing is intentionally not done yet; the artifacts below are unsigned.
+
+      - name: Package (zip)
+        if: startsWith(matrix.rid, 'win')
+        shell: bash
+        run: |
+          cd publish/${{ matrix.rid }}
+          7z a ../../dbclient-${{ steps.ver.outputs.version }}-${{ matrix.rid }}.zip .
+
+      - name: Package (tar.gz)
+        if: ${{ !startsWith(matrix.rid, 'win') }}
+        shell: bash
+        run: |
+          tar -C publish/${{ matrix.rid }} -czf dbclient-${{ steps.ver.outputs.version }}-${{ matrix.rid }}.tar.gz .
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dbclient-*.zip
+            dbclient-*.tar.gz
+          generate_release_notes: true
