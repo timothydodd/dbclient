@@ -703,9 +703,14 @@ public class ConnectionTreeNode : ViewModelBase
         set => SetField(ref _isExpanded, value);
     }
 
-    public IBrush NameBrush => Services.ThemeColors.Get(
-        NodeType == ConnectionTreeNodeType.Database ? "DatabaseNodeColor" : "TreeNodeColor",
-        NodeType == ConnectionTreeNodeType.Database ? "#558cb1" : "#DBE6EC");
+    /// <summary>When set (database nodes), the name is tinted with the same name-derived color as the query tabs.</summary>
+    public string? ColorName { get; set; }
+
+    public IBrush NameBrush => ColorName != null
+        ? Services.NameColors.ForName(ColorName)
+        : Services.ThemeColors.Get(
+            NodeType == ConnectionTreeNodeType.Database ? "DatabaseNodeColor" : "TreeNodeColor",
+            NodeType == ConnectionTreeNodeType.Database ? "#558cb1" : "#DBE6EC");
 
     public void RefreshThemeBrushes()
     {

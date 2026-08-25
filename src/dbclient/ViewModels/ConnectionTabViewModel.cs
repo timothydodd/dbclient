@@ -294,7 +294,11 @@ public class ConnectionTabViewModel : ViewModelBase
         QueryTabs.Clear();
         if (_stashedTabs.TryGetValue(database, out var newTabs))
         {
-            foreach (var t in newTabs) QueryTabs.Add(t);
+            foreach (var t in newTabs)
+            {
+                t.Database = database;
+                QueryTabs.Add(t);
+            }
             _stashedTabs.Remove(database);
         }
 
@@ -324,6 +328,7 @@ public class ConnectionTabViewModel : ViewModelBase
             };
             tab.SetInitialQueryText(ts.QueryText);
             tab.RestoreFileBacking(ts.FilePath);
+            tab.Database = key;
             AttachTab(tab);
             list.Add(tab);
         }
@@ -397,7 +402,7 @@ public class ConnectionTabViewModel : ViewModelBase
             // Show all databases as top-level nodes
             foreach (var dbName in AvailableDatabases)
             {
-                var dbNode = new ConnectionTreeNode(dbName, ConnectionTreeNodeType.Database);
+                var dbNode = new ConnectionTreeNode(dbName, ConnectionTreeNodeType.Database) { ColorName = dbName };
 
                 // Only load schema for the active database
                 if (dbName == activeDatabase)
@@ -594,7 +599,8 @@ public class ConnectionTabViewModel : ViewModelBase
         {
             Id = id ?? Guid.NewGuid().ToString("N"),
             Title = title ?? $"Query {_queryTabCounter}",
-            IntelliSenseProvider = IntelliSenseProvider
+            IntelliSenseProvider = IntelliSenseProvider,
+            Database = !string.IsNullOrEmpty(_tabsActiveDb) ? _tabsActiveDb : ActiveDatabase
         };
         tab.SetInitialQueryText(queryText);
         AttachTab(tab);

@@ -70,7 +70,7 @@ dbclient/
 
 #### Two-Level Tab System
 - **Connection tabs** (top strip) — one per database connection, color-coded by name hash (deterministic HSL). Switching tabs swaps the entire context.
-- **Query sub-tabs** (below) — isolated per connection. Each has its own editor text, results, IntelliSense.
+- **Query sub-tabs** (below) — a separate **set per connection + database**: `ConnectionTabViewModel` keeps the active database's tabs in `QueryTabs` and stashes the others (`_stashedTabs`), swapping sets in `ActivateDatabaseTabs` when the database changes (selecting a database node in the tree, or a saved state restore). Each `SessionTabViewModel` carries `Database`; the tab shows a badge (dot + name + selected underline) colored by `NameColors.ForName(database)` — hue hashed from the name, saturation/lightness tuned per theme — and the database node in the schema tree uses the same color (`ConnectionTreeNode.ColorName`). Each tab has its own editor text, results, IntelliSense.
 - Both tab strips are inside the right column only; the left panel is independent.
 
 #### IntelliSense (lib/dbclient.IntelliSense/)

@@ -43,6 +43,32 @@ public class SessionTabViewModel : ViewModelBase
         set => SetField(ref _title, value);
     }
 
+    private string _database = "";
+    /// <summary>
+    /// The database this query tab belongs to. Each connection keeps a separate set of query tabs per
+    /// database (ConnectionTabViewModel stashes the sets and swaps them when the active database changes).
+    /// </summary>
+    public string Database
+    {
+        get => _database;
+        set
+        {
+            if (SetField(ref _database, value))
+            {
+                OnPropertyChanged(nameof(HasDatabase));
+                OnPropertyChanged(nameof(DatabaseColor));
+            }
+        }
+    }
+
+    public bool HasDatabase => !string.IsNullOrEmpty(_database);
+
+    /// <summary>Theme-aware accent derived from the database name (same color as the database node in the tree).</summary>
+    public IBrush DatabaseColor => Services.NameColors.ForName(_database);
+
+    /// <summary>Re-evaluate name-derived brushes after a theme swap.</summary>
+    public void RefreshThemeBrushes() => OnPropertyChanged(nameof(DatabaseColor));
+
     public string QueryText
     {
         get => _queryText;

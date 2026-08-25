@@ -140,8 +140,12 @@ public partial class ConnectionPanel : UserControl
         if (_vm != null)
         {
             foreach (var connTab in _vm.ConnectionTabs)
+            {
                 foreach (var node in connTab.ConnectionTree)
                     node.RefreshThemeBrushes();
+                foreach (var tab in connTab.AllTabs())
+                    tab.RefreshThemeBrushes();
+            }
         }
         BuildSavedConnectionsList();
     }

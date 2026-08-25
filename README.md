@@ -22,7 +22,7 @@ A modern, cross-platform SQL client built with Avalonia UI and .NET 10. Connect 
 
 ### Workspace
 
-- **Two-level tabs** — top strip for database connections (color-coded by name hash), inner strip for query tabs.
+- **Two-level tabs** — top strip for database connections (color-coded by name hash); inner strip for query tabs, kept as a **separate set per database** — select a database in the schema tree and you get that database's own tabs. Each query tab carries a badge colored by its database name (theme-aware), matching the database's color in the tree.
 - **Per-database query tabs** — each database in a connection keeps its own group of query tabs. Switching databases swaps the tab strip; queries written before connecting migrate into the first database automatically.
 - **Drag-to-reorder tabs**, inline rename (double-click), close-others / close-to-right / close-to-left from the context menu.
 - **Persistent state** — open connections, active database, query text, panel layout, and theme are saved per connection under `~/.dbclient/` and restored on launch.
