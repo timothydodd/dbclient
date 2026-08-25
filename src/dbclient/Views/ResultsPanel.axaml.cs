@@ -301,9 +301,11 @@ public partial class ResultsPanel : UserControl
     private static DataGridTemplateColumn BuildDataColumn(int index, string header, IBrush? typeBrush, bool editable)
     {
         var path = $"[{index}]";
-        var nullBrush = ThemeColors.MutedText;
-        var foregroundConverter = new FuncValueConverter<string?, object?>(v =>
-            v == null ? nullBrush : (object?)typeBrush ?? AvaloniaProperty.UnsetValue);
+        // Always hand the TextBlock an explicit brush: relying on UnsetValue to fall back to the
+        // DataGridCell style is unreliable inside template columns and made text render dark.
+        var nullBrush = ThemeColors.Get("DataTypeNull", "#7f8a94");
+        var textBrush = typeBrush ?? ThemeColors.Get("ResultsCellText", "#DBE6EC");
+        var foregroundConverter = new FuncValueConverter<string?, IBrush>(v => v == null ? nullBrush : textBrush);
 
         return new DataGridTemplateColumn
         {

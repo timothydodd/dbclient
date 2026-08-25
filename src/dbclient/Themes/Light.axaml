@@ -63,6 +63,8 @@
         <SolidColorBrush x:Key="InfoColor" Color="#6b7280"/>
         <SolidColorBrush x:Key="NormalText" Color="#111827"/>
         <SolidColorBrush x:Key="MutedText" Color="#9ca3af"/>
+        <!-- Results grid cell text (used by ResultsPanel cell templates) -->
+        <SolidColorBrush x:Key="ResultsCellText" Color="#111827"/>
         <SolidColorBrush x:Key="CompletionText" Color="#111827"/>
         <SolidColorBrush x:Key="CompletionDescText" Color="#6b7280"/>
 
@@ -468,7 +470,7 @@
     </Style>
 
     <Style Selector="DataGridCell TextBlock">
-        <Setter Property="Foreground" Value="#1e1e1e"/>
+        <Setter Property="Foreground" Value="{DynamicResource ResultsCellText}"/>
         <Setter Property="FontSize" Value="11"/>
         <Setter Property="Padding" Value="6,0,0,0"/>
     </Style>
