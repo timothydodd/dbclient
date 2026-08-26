@@ -45,8 +45,6 @@ public class TabState
     public string QueryText { get; set; } = "";
     public int Order { get; set; }
     public string Database { get; set; } = "";
-    /// <summary>Backing .sql file when the tab was opened from / saved to disk.</summary>
-    public string? FilePath { get; set; }
 }
 
 public class StateService

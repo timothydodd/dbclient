@@ -123,11 +123,10 @@ Then in the New Connection dialog, pick **SQL Server**, set the server (e.g. `my
 | Shortcut | Action |
 |---|---|
 | Ctrl+N | New query tab |
-| Ctrl+W | Close query tab (prompts if unsaved) |
+| Ctrl+W | Close query tab (prompts if it has text) |
 | Ctrl+Tab / Ctrl+Shift+Tab | Next / previous query tab |
-| Ctrl+O | Open .sql file |
-| Ctrl+S | Save .sql file (Save As when tab has no file) |
-| Ctrl+Shift+S | Save .sql file as… |
+| Ctrl+O | Import .sql file into a query tab |
+| Ctrl+S | Export current tab to a .sql file |
 | F5 / Ctrl+Enter | Execute query (selection or whole editor) |
 | Esc | Cancel running query |
 | Ctrl+E | Explain query plan |

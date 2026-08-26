@@ -227,7 +227,7 @@
                 <DockPanel>
                     <Border DockPanel.Dock="Top" Background="{DynamicResource PanelHeaderBackground}" Padding="10,6">
                         <DockPanel>
-                            <Button DockPanel.Dock="Right" Click="ToggleConnectionsOverlay_Click"
+                            <Button x:Name="ConnectionsOverlayClose" DockPanel.Dock="Right" Click="ToggleConnectionsOverlay_Click"
                                     Background="Transparent" Padding="2" Width="22" Height="22" ToolTip.Tip="Close">
                                 <Path Data="M18 6 6 18M6 6l12 12" Stroke="{DynamicResource MenuIconColor}"
                                       StrokeThickness="1.5" StrokeLineCap="Round" Stretch="Uniform" Width="10" Height="10"/>

@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Text;
 using Avalonia;
 using Avalonia.Controls;
@@ -159,10 +160,17 @@ public partial class ConnectionPanel : UserControl
                 _vm.PropertyChanged -= _vmPropertyChangedHandler;
             if (_savedConnectionsHandler != null)
                 _vm.SavedConnections.CollectionChanged -= _savedConnectionsHandler;
+            if (_connectionTabsHandler != null)
+                _vm.ConnectionTabs.CollectionChanged -= _connectionTabsHandler;
         }
 
         _vm = DataContext as MainWindowViewModel;
         if (_vm == null) return;
+
+        // With no open connections the panel has nothing to show but the connections list, so keep it up.
+        _connectionTabsHandler = (_, _) => SetConnectionsOverlay(_vm.ConnectionTabs.Count == 0);
+        _vm.ConnectionTabs.CollectionChanged += _connectionTabsHandler;
+        SetConnectionsOverlay(_vm.ConnectionTabs.Count == 0);
 
         // When selected connection tab changes, rebind the tree
         _vmPropertyChangedHandler = (_, args) =>
@@ -180,7 +188,22 @@ public partial class ConnectionPanel : UserControl
         _vm.SavedConnections.CollectionChanged += _savedConnectionsHandler;
     }
 
+    private NotifyCollectionChangedEventHandler? _connectionTabsHandler;
     private ConnectionTabViewModel? _boundConnTab;
+
+    /// <summary>
+    /// Show/hide the connections overlay. While nothing is connected the overlay is forced visible and
+    /// its close button hidden — there is nothing else for the panel to show.
+    /// </summary>
+    public void SetConnectionsOverlay(bool visible)
+    {
+        var overlay = this.FindControl<Border>("ConnectionsOverlay");
+        if (overlay == null) return;
+        bool forced = _vm == null || _vm.ConnectionTabs.Count == 0;
+        overlay.IsVisible = forced || visible;
+        var close = this.FindControl<Button>("ConnectionsOverlayClose");
+        if (close != null) close.IsVisible = !forced;
+    }
 
     private void BindTreeToActiveConnection()
     {
@@ -339,7 +362,7 @@ public partial class ConnectionPanel : UserControl
     {
         var overlay = this.FindControl<Border>("ConnectionsOverlay");
         if (overlay != null)
-            overlay.IsVisible = !overlay.IsVisible;
+            SetConnectionsOverlay(!overlay.IsVisible);
     }
 
     private async void NewConnection_Click(object? sender, RoutedEventArgs e)
@@ -355,8 +378,7 @@ public partial class ConnectionPanel : UserControl
             if (dialog.Result != null)
             {
                 await _vm.OpenConnectionTabAsync(dialog.Result);
-                var overlay = this.FindControl<Border>("ConnectionsOverlay");
-                if (overlay != null) overlay.IsVisible = false;
+                SetConnectionsOverlay(false);
             }
         }
         catch (Exception ex) { AppLogger.Error("New connection failed", ex); }
@@ -602,8 +624,7 @@ public partial class ConnectionPanel : UserControl
             if (config != null && _vm != null)
             {
                 await _vm.OpenConnectionTabAsync(config);
-                var overlay = this.FindControl<Border>("ConnectionsOverlay");
-                if (overlay != null) overlay.IsVisible = false;
+                SetConnectionsOverlay(false);
             }
         }
         catch (Exception ex) { AppLogger.Error("Open saved connection failed", ex); }

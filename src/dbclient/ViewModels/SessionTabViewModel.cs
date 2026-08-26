@@ -21,11 +21,6 @@ public class SessionTabViewModel : ViewModelBase
     private string _messages = "";
     private string _statusText = "";
     private string _executionTimeText = "";
-    private string? _filePath;
-
-    /// <summary>Text as last read from / written to <see cref="FilePath"/>. Only meaningful when file-backed.</summary>
-    private string _diskText = "";
-
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
 
     public CancellationTokenSource? ExecutionCts { get; set; }
@@ -72,11 +67,7 @@ public class SessionTabViewModel : ViewModelBase
     public string QueryText
     {
         get => _queryText;
-        set
-        {
-            if (SetField(ref _queryText, value))
-                OnPropertyChanged(nameof(IsDirty));
-        }
+        set => SetField(ref _queryText, value);
     }
 
     public string QueryTextToExecute
@@ -86,54 +77,10 @@ public class SessionTabViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Backing .sql file. When set, the tab title is the file name and <see cref="IsDirty"/>
-    /// reflects whether the editor text differs from what is on disk.
+    /// Tabs are persistent (autosaved into app state), so there is no notion of "unsaved". Closing a tab
+    /// should still prompt whenever it contains text, because that text would be lost.
     /// </summary>
-    public string? FilePath
-    {
-        get => _filePath;
-        set
-        {
-            if (SetField(ref _filePath, value))
-            {
-                OnPropertyChanged(nameof(IsFileBacked));
-                OnPropertyChanged(nameof(IsDirty));
-            }
-        }
-    }
-
-    public bool IsFileBacked => !string.IsNullOrEmpty(_filePath);
-
-    /// <summary>
-    /// "Dirty" only has meaning for file-backed tabs: the editor text differs from the file on disk.
-    /// Non-file tabs are autosaved into app state, so they are never shown as dirty.
-    /// </summary>
-    public bool IsDirty => IsFileBacked && !string.Equals(_queryText, _diskText, StringComparison.Ordinal);
-
-    /// <summary>
-    /// Whether closing this tab should prompt the user. File-backed tabs prompt when unsaved;
-    /// scratch tabs prompt whenever they contain any text (it would be lost).
-    /// </summary>
-    public bool ShouldConfirmClose => IsFileBacked ? IsDirty : !string.IsNullOrWhiteSpace(_queryText);
-
-    /// <summary>Record that the current text matches the file at <paramref name="path"/>.</summary>
-    public void MarkSavedToFile(string path, string text)
-    {
-        _diskText = text;
-        _queryText = text;
-        OnPropertyChanged(nameof(QueryText));
-        FilePath = path;
-        Title = Path.GetFileName(path);
-        OnPropertyChanged(nameof(IsDirty));
-    }
-
-    /// <summary>Restore a file-backed tab from state: assume the saved text matched disk at the time.</summary>
-    public void RestoreFileBacking(string? path)
-    {
-        if (string.IsNullOrEmpty(path)) return;
-        _diskText = _queryText;
-        FilePath = path;
-    }
+    public bool ShouldConfirmClose => !string.IsNullOrWhiteSpace(_queryText);
 
     public int CursorLine
     {
@@ -231,7 +178,6 @@ public class SessionTabViewModel : ViewModelBase
     {
         _queryText = text;
         OnPropertyChanged(nameof(QueryText));
-        OnPropertyChanged(nameof(IsDirty));
     }
 
     public event EventHandler<string>? QueryTextSet;
@@ -240,7 +186,6 @@ public class SessionTabViewModel : ViewModelBase
     {
         _queryText = text;
         OnPropertyChanged(nameof(QueryText));
-        OnPropertyChanged(nameof(IsDirty));
         QueryTextSet?.Invoke(this, text);
     }
 

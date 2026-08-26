@@ -41,8 +41,8 @@ public partial class MainWindow : Window
             {
                 // ViewModels never touch Windows: install the UI-side handlers they call out to.
                 vm.ConfirmHandler = (title, msg) => ConfirmDialog.ShowAsync(this, title, msg, "Close");
-                vm.PickOpenFileHandler = PickOpenFileAsync;
-                vm.PickSaveFileHandler = PickSaveFileAsync;
+                vm.PickImportFileHandler = PickImportFileAsync;
+                vm.PickExportFileHandler = PickExportFileAsync;
 
                 vm.PropertyChanged += (_, e) =>
                 {
@@ -167,22 +167,22 @@ public partial class MainWindow : Window
     private static readonly FilePickerFileType SqlFileType = new("SQL files") { Patterns = ["*.sql"] };
     private static readonly FilePickerFileType AllFileType = new("All files") { Patterns = ["*"] };
 
-    private async Task<string?> PickOpenFileAsync()
+    private async Task<string?> PickImportFileAsync()
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Open SQL file",
+            Title = "Import SQL file",
             AllowMultiple = false,
             FileTypeFilter = [SqlFileType, AllFileType]
         });
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
 
-    private async Task<string?> PickSaveFileAsync(string suggestedName)
+    private async Task<string?> PickExportFileAsync(string suggestedName)
     {
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Save SQL file",
+            Title = "Export SQL file",
             SuggestedFileName = suggestedName,
             DefaultExtension = "sql",
             ShowOverwritePrompt = true,
@@ -245,9 +245,7 @@ public partial class MainWindow : Window
             UpdateConnectionPanel(true);
         }
 
-        var overlay = ConnectionPanelControl.FindControl<Border>("ConnectionsOverlay");
-        if (overlay != null)
-            overlay.IsVisible = true;
+        ConnectionPanelControl.SetConnectionsOverlay(true);
     }
 
     private void UpdateConnectionPanel(bool isOpen)

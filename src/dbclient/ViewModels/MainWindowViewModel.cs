@@ -34,10 +34,10 @@ public class MainWindowViewModel : ViewModelBase
 
     /// <summary>Show a confirm dialog: (title, message) => true when the user accepted.</summary>
     public Func<string, string, Task<bool>>? ConfirmHandler { get; set; }
-    /// <summary>Show an open-file picker for *.sql; returns the chosen path or null.</summary>
-    public Func<Task<string?>>? PickOpenFileHandler { get; set; }
-    /// <summary>Show a save-file picker for *.sql (suggested name) ; returns the chosen path or null.</summary>
-    public Func<string, Task<string?>>? PickSaveFileHandler { get; set; }
+    /// <summary>Show an open-file picker for *.sql (import); returns the chosen path or null.</summary>
+    public Func<Task<string?>>? PickImportFileHandler { get; set; }
+    /// <summary>Show a save-file picker for *.sql (export, suggested name); returns the chosen path or null.</summary>
+    public Func<string, Task<string?>>? PickExportFileHandler { get; set; }
 
     public RelayCommand NewQueryTabCommand { get; }
     public RelayCommand CloseQueryTabCommand { get; }
@@ -47,9 +47,10 @@ public class MainWindowViewModel : ViewModelBase
     public RelayCommand ExplainQueryCommand { get; }
     /// <summary>Save workspace/app state now (state also autosaves).</summary>
     public RelayCommand SaveCommand { get; }
-    public RelayCommand OpenFileCommand { get; }
-    public RelayCommand SaveFileCommand { get; }
-    public RelayCommand SaveFileAsCommand { get; }
+    /// <summary>Import a .sql file into a query tab (a copy; the tab is not linked to the file).</summary>
+    public RelayCommand ImportFileCommand { get; }
+    /// <summary>Export the current tab's text to a .sql file.</summary>
+    public RelayCommand ExportFileCommand { get; }
     public RelayCommand ToggleConnectionPanelCommand { get; }
     public RelayCommand ToggleHistoryPanelCommand { get; }
     public RelayCommand ToggleThemeCommand { get; }
@@ -65,13 +66,17 @@ public class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel()
     {
+        // With nothing connected the only useful UI is the connections list in the left panel, so make sure it's showing.
+        ConnectionTabs.CollectionChanged += (_, _) =>
+        {
+            if (ConnectionTabs.Count == 0) IsConnectionPanelOpen = true;
+        };
         NewQueryTabCommand = new RelayCommand(() => SelectedConnectionTab?.NewQueryTab());
         CloseQueryTabCommand = new RelayCommand(p => _ = SafeFireAndForget(SelectedConnectionTab?.CloseQueryTabAsync(p as SessionTabViewModel)));
         CloseConnectionTabCommand = new RelayCommand(p => _ = SafeFireAndForget(CloseConnectionTabAsync(p as ConnectionTabViewModel)));
         SaveCommand = new RelayCommand(SaveState);
-        OpenFileCommand = new RelayCommand(() => _ = SafeFireAndForget(OpenFileAsync()));
-        SaveFileCommand = new RelayCommand(() => _ = SafeFireAndForget(SaveFileAsync(saveAs: false)));
-        SaveFileAsCommand = new RelayCommand(() => _ = SafeFireAndForget(SaveFileAsync(saveAs: true)));
+        ImportFileCommand = new RelayCommand(() => _ = SafeFireAndForget(ImportFileAsync()));
+        ExportFileCommand = new RelayCommand(() => _ = SafeFireAndForget(ExportFileAsync()));
         ExecuteQueryCommand = new RelayCommand(() => _ = SafeFireAndForget(ExecuteAsync()));
         CancelQueryCommand = new RelayCommand(() => SelectedConnectionTab?.SelectedQueryTab?.ExecutionCts?.Cancel());
         FormatQueryCommand = new RelayCommand(FormatCurrentQuery);
@@ -308,17 +313,7 @@ public class MainWindowViewModel : ViewModelBase
         tab ??= SelectedConnectionTab;
         if (tab == null) return;
 
-        // Prompt once if any open tab has something worth keeping.
-        var dirty = tab.AllTabs().Where(t => t.ShouldConfirmClose).ToList();
-        if (dirty.Count > 0 && ConfirmHandler != null)
-        {
-            var msg = dirty.Count == 1
-                ? $"Close '{tab.DisplayName}'? Unsaved query in '{dirty[0].Title}' will be lost."
-                : $"Close '{tab.DisplayName}'? Unsaved queries in {dirty.Count} tabs will be lost.";
-            if (!await ConfirmHandler("Close Connection", msg)) return;
-        }
-
-        // Save this connection's session state before closing
+        // No prompt: the connection's query tabs are persisted to state below and come back on reconnect.
         SaveConnectionState(tab);
 
         var index = ConnectionTabs.IndexOf(tab);
@@ -436,22 +431,24 @@ public class MainWindowViewModel : ViewModelBase
         tab.SetQueryText(SqlFormatter.Format(tab.QueryText));
     }
 
-    // ---- .sql file open / save ----
+    // ---- .sql file import / export ----
+    // Tabs are persistent and autosaved into app state, so files are never "linked" to a tab:
+    // importing copies a file's contents into a tab, exporting writes a tab's text out.
 
-    public async Task OpenFileAsync()
+    public async Task ImportFileAsync()
     {
-        if (PickOpenFileHandler == null) return;
-        var path = await PickOpenFileHandler();
+        if (PickImportFileHandler == null) return;
+        var path = await PickImportFileHandler();
         if (string.IsNullOrEmpty(path)) return;
-        await OpenFileAsync(path);
+        await ImportFileAsync(path);
     }
 
-    public async Task OpenFileAsync(string path)
+    public async Task ImportFileAsync(string path)
     {
         var connTab = SelectedConnectionTab;
         if (connTab == null)
         {
-            AppLogger.Warn("Open SQL ignored: no connection tab selected");
+            AppLogger.Warn("Import SQL ignored: no connection tab selected");
             return;
         }
 
@@ -462,62 +459,45 @@ public class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            AppLogger.Error($"Failed to open {path}", ex);
+            AppLogger.Error($"Failed to import {path}", ex);
             if (connTab.SelectedQueryTab != null)
             {
                 connTab.SelectedQueryTab.HasMessage = true;
-                connTab.SelectedQueryTab.Message = $"Could not open file: {ex.Message}";
+                connTab.SelectedQueryTab.Message = $"Could not import file: {ex.Message}";
                 connTab.SelectedQueryTab.MessageColor = ThemeColors.Error;
             }
             return;
         }
 
-        // Already open? Just switch to it.
-        var open = connTab.QueryTabs.FirstOrDefault(t =>
-            t.FilePath != null && string.Equals(Path.GetFullPath(t.FilePath), Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase));
-        if (open != null)
-        {
-            connTab.SelectedQueryTab = open;
-            return;
-        }
-
-        // Reuse the current tab if it's an empty scratch tab, otherwise open a new one.
+        // Reuse the current tab if it's an empty scratch tab, otherwise import into a new one.
         var target = connTab.SelectedQueryTab;
-        if (target == null || target.IsFileBacked || !string.IsNullOrWhiteSpace(target.QueryText))
+        if (target == null || !string.IsNullOrWhiteSpace(target.QueryText))
             target = connTab.NewQueryTab();
 
-        target.SetQueryText(text);          // syncs the editor
-        target.MarkSavedToFile(path, text); // records disk text so IsDirty is false
+        target.Title = Path.GetFileNameWithoutExtension(path);
+        target.SetQueryText(text); // syncs the editor
+        target.StatusText = $"Imported {Path.GetFileName(path)}";
         SaveState();
     }
 
-    public async Task SaveFileAsync(bool saveAs)
+    public async Task ExportFileAsync()
     {
         var tab = SelectedConnectionTab?.SelectedQueryTab;
-        if (tab == null) return;
+        if (tab == null || PickExportFileHandler == null) return;
 
-        var path = tab.FilePath;
-        if (saveAs || string.IsNullOrEmpty(path))
-        {
-            if (PickSaveFileHandler == null) return;
-            var suggested = tab.IsFileBacked ? Path.GetFileName(tab.FilePath!) : $"{tab.Title}.sql";
-            path = await PickSaveFileHandler(suggested);
-            if (string.IsNullOrEmpty(path)) return;
-        }
+        var path = await PickExportFileHandler($"{tab.Title}.sql");
+        if (string.IsNullOrEmpty(path)) return;
 
         try
         {
-            var text = tab.QueryText;
-            await File.WriteAllTextAsync(path, text);
-            tab.MarkSavedToFile(path, text);
-            tab.StatusText = $"Saved {Path.GetFileName(path)}";
-            SaveState();
+            await File.WriteAllTextAsync(path, tab.QueryText);
+            tab.StatusText = $"Exported {Path.GetFileName(path)}";
         }
         catch (Exception ex)
         {
-            AppLogger.Error($"Failed to save {path}", ex);
+            AppLogger.Error($"Failed to export {path}", ex);
             tab.HasMessage = true;
-            tab.Message = $"Could not save file: {ex.Message}";
+            tab.Message = $"Could not export file: {ex.Message}";
             tab.MessageColor = ThemeColors.Error;
         }
     }
@@ -678,6 +658,9 @@ public class MainWindowViewModel : ViewModelBase
         if (state.ActiveConnectionTabId != null)
             SelectedConnectionTab = ConnectionTabs.FirstOrDefault(t => t.Config.Id == state.ActiveConnectionTabId);
         SelectedConnectionTab ??= ConnectionTabs.FirstOrDefault();
+
+        // Nothing to reconnect: the connections list is the only thing worth showing.
+        if (ConnectionTabs.Count == 0) IsConnectionPanelOpen = true;
     }
 }
 

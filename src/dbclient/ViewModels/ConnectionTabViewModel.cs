@@ -327,7 +327,6 @@ public class ConnectionTabViewModel : ViewModelBase
                 IntelliSenseProvider = IntelliSenseProvider
             };
             tab.SetInitialQueryText(ts.QueryText);
-            tab.RestoreFileBacking(ts.FilePath);
             tab.Database = key;
             AttachTab(tab);
             list.Add(tab);
@@ -354,8 +353,7 @@ public class ConnectionTabViewModel : ViewModelBase
                 Title = t.Title,
                 QueryText = t.QueryText,
                 Database = _tabsActiveDb,
-                Order = i,
-                FilePath = t.FilePath
+                Order = i
             };
         }
 
@@ -370,8 +368,7 @@ public class ConnectionTabViewModel : ViewModelBase
                     Title = t.Title,
                     QueryText = t.QueryText,
                     Database = db,
-                    Order = i,
-                    FilePath = t.FilePath
+                    Order = i
                 };
             }
         }
@@ -626,9 +623,7 @@ public class ConnectionTabViewModel : ViewModelBase
     private async Task<bool> ConfirmCloseAsync(SessionTabViewModel tab)
     {
         if (!tab.ShouldConfirmClose || ConfirmHandler == null) return true;
-        var msg = tab.IsFileBacked
-            ? $"Close '{tab.Title}'? Unsaved changes will be lost."
-            : $"Close '{tab.Title}'? Unsaved query will be lost.";
+        var msg = $"Close '{tab.Title}'? Its query will be lost.";
         return await ConfirmHandler("Close Tab", msg);
     }
 

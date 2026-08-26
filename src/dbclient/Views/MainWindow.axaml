@@ -24,9 +24,8 @@
         <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseQueryTabCommand}" CommandParameter="{Binding SelectedConnectionTab.SelectedQueryTab}" />
         <KeyBinding Gesture="Ctrl+Tab" Command="{Binding NextQueryTabCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+Tab" Command="{Binding PrevQueryTabCommand}" />
-        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFileCommand}" />
-        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveFileCommand}" />
-        <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveFileAsCommand}" />
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding ImportFileCommand}" />
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding ExportFileCommand}" />
         <!-- Query -->
         <KeyBinding Gesture="F5" Command="{Binding ExecuteQueryCommand}" />
         <KeyBinding Gesture="Ctrl+Return" Command="{Binding ExecuteQueryCommand}" />
@@ -87,19 +86,18 @@
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator />
-                            <MenuItem Header="_Open SQL..." Command="{Binding OpenFileCommand}" InputGesture="Ctrl+O">
+                            <MenuItem Header="_Import SQL..." Command="{Binding ImportFileCommand}" InputGesture="Ctrl+O" ToolTip.Tip="Copy a .sql file into a new query tab">
                                 <MenuItem.Icon>
                                     <Path Data="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
                                           Stroke="{DynamicResource MenuIconColor}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="14" Height="14"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="_Save" Command="{Binding SaveFileCommand}" InputGesture="Ctrl+S">
+                            <MenuItem Header="_Export SQL..." Command="{Binding ExportFileCommand}" InputGesture="Ctrl+S" ToolTip.Tip="Write the current tab to a .sql file">
                                 <MenuItem.Icon>
                                     <Path Data="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7 M7 3v4a1 1 0 0 0 1 1h7"
                                           Stroke="{DynamicResource MenuIconColor}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" Stretch="Uniform" Width="14" Height="14"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="Save _As..." Command="{Binding SaveFileAsCommand}" InputGesture="Ctrl+Shift+S"/>
                             <MenuItem Header="Save _Workspace" Command="{Binding SaveCommand}" ToolTip.Tip="Workspace state autosaves; this forces a save now"/>
                             <Separator />
                             <MenuItem Header="E_xit" Click="Exit_Click" InputGesture="Alt+F4"/>
@@ -304,19 +302,13 @@
                                                 </ContextMenu>
                                             </Grid.ContextMenu>
                                             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10,4">
-                                                <!-- Database badge: dot + name, colored by database name (see NameColors) -->
-                                                <Border Width="7" Height="7" CornerRadius="4" Margin="0,0,5,0"
-                                                        Background="{Binding DatabaseColor}" VerticalAlignment="Center"
-                                                        IsVisible="{Binding HasDatabase}"
-                                                        ToolTip.Tip="{Binding Database}"/>
+                                                <!-- Database badge: name colored by database name (see NameColors) -->
                                                 <TextBlock Text="{Binding Database}" VerticalAlignment="Center" FontSize="10"
                                                            Foreground="{Binding DatabaseColor}" Margin="0,0,6,0"
                                                            MaxWidth="110" TextTrimming="CharacterEllipsis"
                                                            IsVisible="{Binding HasDatabase}"/>
                                                 <TextBlock Text="{Binding Title}" VerticalAlignment="Center" FontSize="11"
                                                            DoubleTapped="TabTitle_DoubleTapped" Tag="{Binding}"/>
-                                                <TextBlock Text="*" FontSize="11" Foreground="{DynamicResource AccentColor}"
-                                                           VerticalAlignment="Center" Margin="3,0,0,0" IsVisible="{Binding IsDirty}"/>
                                                 <Button Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CloseQueryTabCommand}"
                                                         CommandParameter="{Binding}"
                                                         Padding="0" Margin="6,0,0,0" Width="18" Height="18"
@@ -327,6 +319,10 @@
                                                           StrokeThickness="2" StrokeLineCap="Round" Stretch="Uniform" Width="7" Height="7"/>
                                                 </Button>
                                             </StackPanel>
+                                            <!-- Divider between unselected tabs (hidden on the selected tab, whose underline separates it) -->
+                                            <Border Grid.Row="0" Width="1" Height="14" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                    Background="{DynamicResource PanelBorder}" Opacity="0.6"
+                                                    IsVisible="{Binding !$parent[ListBoxItem].IsSelected}"/>
                                             <!-- Selected underline takes the database color so the whole tab set reads as one database -->
                                             <Border Grid.Row="1" Background="{Binding DatabaseColor}"
                                                     IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
