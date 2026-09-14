@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Data;
 using Avalonia.Media;
+using dbclient.Data;
 using dbclient.Data.Connections;
 using dbclient.Data.Models;
 using dbclient.IntelliSense;
@@ -239,6 +240,96 @@ public class ConnectionTabViewModel : ViewModelBase
         finally
         {
             IsSchemaLoading = false;
+        }
+    }
+
+    /// <summary>Server-level database used for administrative statements (rename / drop).</summary>
+    private string AdminDatabase => Config.Type switch
+    {
+        ConnectionType.MySql => "information_schema",
+        _ => "master"
+    };
+
+    public bool SupportsRenameDatabase => Config.Type == ConnectionType.SqlServer;
+    public bool SupportsDropDatabase => Config.Type is ConnectionType.SqlServer or ConnectionType.MySql;
+
+    /// <summary>Renames a database on the server. Returns an error message, or null on success.</summary>
+    public async Task<string?> RenameDatabaseAsync(string oldName, string newName)
+    {
+        if (Connection == null) return "Not connected.";
+        if (!SupportsRenameDatabase) return $"Rename is not supported for {Config.Type} connections.";
+        if (string.Equals(oldName, newName, StringComparison.Ordinal)) return null;
+
+        var dialect = UpdateSqlGenerator.DialectFor(Config.Type);
+        var q = (string n) => SqlIdentifier.Quote(dialect, n);
+        // Kick other sessions (including our own pooled connections) so the rename can take the lock.
+        var sql = $"ALTER DATABASE {q(oldName)} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;\n" +
+                  $"ALTER DATABASE {q(oldName)} MODIFY NAME = {q(newName)};\n" +
+                  $"ALTER DATABASE {q(newName)} SET MULTI_USER;";
+
+        var result = await Connection.ExecuteQueryAsync(AdminDatabase, sql);
+        if (result.IsError) return result.ErrorMessage;
+
+        RenameTabSet(oldName, newName);
+        var wasActive = string.Equals(ActiveDatabase, oldName, StringComparison.OrdinalIgnoreCase);
+        if (wasActive) ActiveDatabase = newName;
+
+        await ReloadDatabasesAsync();
+        if (wasActive) await SwitchDatabaseAsync(newName, force: true);
+        StatusText = $"Renamed {oldName} to {newName}";
+        return null;
+    }
+
+    /// <summary>Drops a database on the server. Returns an error message, or null on success.</summary>
+    public async Task<string?> DropDatabaseAsync(string name)
+    {
+        if (Connection == null) return "Not connected.";
+        if (!SupportsDropDatabase) return $"Delete is not supported for {Config.Type} connections.";
+
+        var dialect = UpdateSqlGenerator.DialectFor(Config.Type);
+        var quoted = SqlIdentifier.Quote(dialect, name);
+        var sql = Config.Type == ConnectionType.SqlServer
+            ? $"ALTER DATABASE {quoted} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;\nDROP DATABASE {quoted};"
+            : $"DROP DATABASE {quoted};";
+
+        var result = await Connection.ExecuteQueryAsync(AdminDatabase, sql);
+        if (result.IsError) return result.ErrorMessage;
+
+        var wasActive = string.Equals(ActiveDatabase, name, StringComparison.OrdinalIgnoreCase);
+        await ReloadDatabasesAsync();
+
+        if (wasActive)
+        {
+            ActiveDatabase = "";
+            var next = AvailableDatabases.FirstOrDefault();
+            if (next != null)
+                await SwitchDatabaseAsync(next, force: true);
+            else
+            {
+                ConnectionTree.Clear();
+                _unfilteredTree.Clear();
+            }
+        }
+        // Tabs that belonged to the dropped database are discarded.
+        _stashedTabs.Remove(name);
+        _stashedSelectedTabId.Remove(name);
+        StatusText = $"Deleted {name}";
+        return null;
+    }
+
+    private void RenameTabSet(string oldName, string newName)
+    {
+        if (_stashedTabs.Remove(oldName, out var bucket))
+        {
+            foreach (var t in bucket) t.Database = newName;
+            _stashedTabs[newName] = bucket;
+        }
+        if (_stashedSelectedTabId.Remove(oldName, out var sel))
+            _stashedSelectedTabId[newName] = sel;
+        if (_tabsActiveDb == oldName)
+        {
+            _tabsActiveDb = newName;
+            foreach (var t in QueryTabs) t.Database = newName;
         }
     }
 

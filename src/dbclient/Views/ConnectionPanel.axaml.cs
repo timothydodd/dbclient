@@ -500,6 +500,14 @@ public partial class ConnectionPanel : UserControl
                 AddMenuItem("Switch to Database", () => SwitchDatabase(node.Name));
                 menu.Items.Add(new Separator());
                 AddMenuItem("Copy Name", () => CopyToClipboard(node.Name));
+                if (connTab.SupportsRenameDatabase || connTab.SupportsDropDatabase)
+                {
+                    menu.Items.Add(new Separator());
+                    if (connTab.SupportsRenameDatabase)
+                        AddMenuItem("Rename Database...", () => _ = RenameDatabaseAsync(connTab, node.Name));
+                    if (connTab.SupportsDropDatabase)
+                        AddMenuItem("Delete Database...", () => _ = DeleteDatabaseAsync(connTab, node.Name));
+                }
                 if (connTab.Config.Type == ConnectionType.SqlServer)
                 {
                     menu.Items.Add(new Separator());
@@ -581,6 +589,64 @@ public partial class ConnectionPanel : UserControl
             e.Handled = true;
         }
     }
+
+    #region Rename / delete database
+
+    private async Task RenameDatabaseAsync(ConnectionTabViewModel connTab, string database)
+    {
+        try
+        {
+            if (TopLevel.GetTopLevel(this) is not Window window) return;
+            var newName = await InputDialog.ShowAsync(window, "Rename Database", "New name", database, okText: "Rename");
+            if (string.IsNullOrWhiteSpace(newName) || newName == database) return;
+
+            if (connTab.AvailableDatabases.Any(d => string.Equals(d, newName, StringComparison.OrdinalIgnoreCase)))
+            {
+                await ConfirmDialog.ShowAsync(window, "Rename Database", $"A database named \"{newName}\" already exists.", okText: "OK");
+                return;
+            }
+
+            var ok = await ConfirmDialog.ShowAsync(window, "Rename Database",
+                $"Rename \"{database}\" to \"{newName}\"?\n\nOther sessions using this database will be disconnected.",
+                okText: "Rename");
+            if (!ok) return;
+
+            var error = await connTab.RenameDatabaseAsync(database, newName);
+            if (error != null)
+                await ConfirmDialog.ShowAsync(window, "Rename failed", error, okText: "OK");
+        }
+        catch (Exception ex) { AppLogger.Error("Rename database failed", ex); }
+    }
+
+    private async Task DeleteDatabaseAsync(ConnectionTabViewModel connTab, string database)
+    {
+        try
+        {
+            if (TopLevel.GetTopLevel(this) is not Window window) return;
+
+            var ok = await ConfirmDialog.ShowAsync(window, "Delete Database",
+                $"Permanently delete the database \"{database}\" and all of its data?\n\nThis cannot be undone.",
+                okText: "Delete");
+            if (!ok) return;
+
+            // Second guard: the name must be typed back to confirm.
+            var typed = await InputDialog.ShowAsync(window, "Confirm Delete",
+                $"Type the database name ({database}) to confirm", "", okText: "Delete");
+            if (typed == null) return;
+            if (!string.Equals(typed, database, StringComparison.OrdinalIgnoreCase))
+            {
+                await ConfirmDialog.ShowAsync(window, "Delete Database", "The name did not match. Nothing was deleted.", okText: "OK");
+                return;
+            }
+
+            var error = await connTab.DropDatabaseAsync(database);
+            if (error != null)
+                await ConfirmDialog.ShowAsync(window, "Delete failed", error, okText: "OK");
+        }
+        catch (Exception ex) { AppLogger.Error("Delete database failed", ex); }
+    }
+
+    #endregion
 
     #region DACPAC export / import (SqlPackage)
 
