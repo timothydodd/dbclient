@@ -195,6 +195,17 @@ public class SqlServerConnection : ConnectionBase
         return database;
     }
 
+    /// <summary>
+    /// Builds the connection string an external tool (e.g. SqlPackage) should use to reach
+    /// <paramref name="database"/>. Brings up the SSH tunnel first when one is configured so the
+    /// returned string points at the forwarded local port.
+    /// </summary>
+    public async Task<string> GetExternalConnectionStringAsync(string database, CancellationToken ct = default)
+    {
+        await EnsureSshTunnelAsync(ct);
+        return BuildConnectionString(database);
+    }
+
     private string BuildConnectionString(string database)
     {
         var server = Address;

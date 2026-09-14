@@ -217,6 +217,30 @@ public class ConnectionTabViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Re-reads the server's database list and rebuilds the tree (e.g. after a DACPAC import created a database).</summary>
+    public async Task ReloadDatabasesAsync()
+    {
+        if (Connection == null) return;
+        IsSchemaLoading = true;
+        try
+        {
+            var master = await Connection.LoadDatabasesAsync();
+            AvailableDatabases.Clear();
+            foreach (var db in master.Databases)
+                AvailableDatabases.Add(db.Name);
+            await BuildConnectionTreeAsync(ActiveDatabase);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Reload databases failed", ex);
+            StatusText = $"Reload failed: {ex.Message}";
+        }
+        finally
+        {
+            IsSchemaLoading = false;
+        }
+    }
+
     public async Task SwitchDatabaseAsync(string database, bool force = false)
     {
         if (Connection == null || (!force && database == ActiveDatabase)) return;

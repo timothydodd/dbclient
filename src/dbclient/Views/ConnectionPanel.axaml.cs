@@ -9,6 +9,8 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using dbclient.Data;
+using dbclient.Data.Connections;
+using Avalonia.Platform.Storage;
 using dbclient.Models;
 using dbclient.Services;
 using dbclient.ViewModels;
@@ -456,6 +458,24 @@ public partial class ConnectionPanel : UserControl
                 AddMenuItem("Switch to Database", () => SwitchDatabase(node.Name));
                 menu.Items.Add(new Separator());
                 AddMenuItem("Copy Name", () => CopyToClipboard(node.Name));
+                if (connTab.Config.Type == ConnectionType.SqlServer)
+                {
+                    menu.Items.Add(new Separator());
+                    if (SqlPackageService.IsAvailable)
+                    {
+                        AddMenuItem("Export DACPAC...", () => _ = ExportDacpacAsync(connTab, node.Name));
+                        AddMenuItem("Import DACPAC...", () => _ = ImportDacpacAsync(connTab, node.Name));
+                    }
+                    else
+                    {
+                        menu.Items.Add(new MenuItem
+                        {
+                            Header = "DACPAC (SqlPackage not found)",
+                            IsEnabled = false,
+                            [ToolTip.TipProperty] = SqlPackageService.InstallHint
+                        });
+                    }
+                }
                 break;
 
             case ConnectionTreeNodeType.Table:
@@ -519,6 +539,109 @@ public partial class ConnectionPanel : UserControl
             e.Handled = true;
         }
     }
+
+    #region DACPAC export / import (SqlPackage)
+
+    private static readonly Avalonia.Platform.Storage.FilePickerFileType DacpacFileType =
+        new("DACPAC files") { Patterns = ["*.dacpac"] };
+
+    private async Task ExportDacpacAsync(ConnectionTabViewModel connTab, string database)
+    {
+        try
+        {
+            if (TopLevel.GetTopLevel(this) is not Window window) return;
+            if (connTab.Connection is not SqlServerConnection sql) return;
+
+            var options = new DacpacExportDialog(database);
+            await options.ShowDialog(window);
+            if (!options.Confirmed) return;
+
+            var file = await window.StorageProvider.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions
+            {
+                Title = $"Export {database} as DACPAC",
+                SuggestedFileName = $"{database}.dacpac",
+                DefaultExtension = "dacpac",
+                ShowOverwritePrompt = true,
+                FileTypeChoices = [DacpacFileType]
+            });
+            var path = file?.TryGetLocalPath();
+            if (string.IsNullOrEmpty(path)) return;
+
+            var cs = await sql.GetExternalConnectionStringAsync(database);
+            var ok = await SqlPackageDialog.RunAsync(window, "Export DACPAC",
+                $"Extracting {database} to {Path.GetFileName(path)}",
+                SqlPackageService.ExtractArgs(cs, path, options.IncludeData));
+
+            connTab.StatusText = ok ? $"Exported {Path.GetFileName(path)}" : "DACPAC export failed";
+        }
+        catch (Exception ex) { AppLogger.Error("Export DACPAC failed", ex); }
+    }
+
+    private async Task ImportDacpacAsync(ConnectionTabViewModel connTab, string database)
+    {
+        try
+        {
+            if (TopLevel.GetTopLevel(this) is not Window window) return;
+            if (connTab.Connection is not SqlServerConnection sql) return;
+
+            var dlg = new DacpacImportDialog(database, connTab.AvailableDatabases);
+            await dlg.ShowDialog(window);
+            if (!dlg.Confirmed || string.IsNullOrEmpty(dlg.FilePath) || string.IsNullOrEmpty(dlg.TargetDatabase)) return;
+
+            var target = dlg.TargetDatabase;
+            var cs = await sql.GetExternalConnectionStringAsync(target);
+
+            if (dlg.ScriptOnly)
+            {
+                var scriptFile = await window.StorageProvider.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions
+                {
+                    Title = "Save deployment script",
+                    SuggestedFileName = $"{target}.deploy.sql",
+                    DefaultExtension = "sql",
+                    ShowOverwritePrompt = true,
+                    FileTypeChoices = [new Avalonia.Platform.Storage.FilePickerFileType("SQL files") { Patterns = ["*.sql"] }]
+                });
+                var scriptPath = scriptFile?.TryGetLocalPath();
+                if (string.IsNullOrEmpty(scriptPath)) return;
+
+                var ok = await SqlPackageDialog.RunAsync(window, "Generate deployment script",
+                    $"Scripting {Path.GetFileName(dlg.FilePath)} against {target}",
+                    SqlPackageService.ScriptArgs(dlg.FilePath, cs, target, scriptPath, dlg.BlockOnDataLoss));
+
+                if (ok && File.Exists(scriptPath))
+                {
+                    // Open the generated script in a new query tab for review.
+                    var text = await File.ReadAllTextAsync(scriptPath);
+                    var tab = connTab.NewQueryTab();
+                    tab.Title = Path.GetFileNameWithoutExtension(scriptPath);
+                    tab.SetQueryText(text);
+                    tab.StatusText = $"Deployment script for {target}";
+                }
+                return;
+            }
+
+            var exists = connTab.AvailableDatabases.Any(d => string.Equals(d, target, StringComparison.OrdinalIgnoreCase));
+            var message = exists
+                ? $"Publish {Path.GetFileName(dlg.FilePath)} to the EXISTING database \"{target}\"?\n\nObjects will be altered or dropped to match the DACPAC."
+                : $"Publish {Path.GetFileName(dlg.FilePath)} as a new database \"{target}\"?";
+            if (!await ConfirmDialog.ShowAsync(window, "Import DACPAC", message, okText: "Publish")) return;
+
+            var success = await SqlPackageDialog.RunAsync(window, "Import DACPAC",
+                $"Publishing {Path.GetFileName(dlg.FilePath)} to {target}",
+                SqlPackageService.PublishArgs(dlg.FilePath, cs, target, dlg.BlockOnDataLoss));
+
+            connTab.StatusText = success ? $"Imported {target}" : "DACPAC import failed";
+            if (success)
+            {
+                await connTab.ReloadDatabasesAsync();
+                if (string.Equals(connTab.ActiveDatabase, target, StringComparison.OrdinalIgnoreCase))
+                    await connTab.SwitchDatabaseAsync(target, force: true);
+            }
+        }
+        catch (Exception ex) { AppLogger.Error("Import DACPAC failed", ex); }
+    }
+
+    #endregion
 
     private void TreeItem_DoubleTapped(object? sender, Avalonia.Input.TappedEventArgs e)
     {
