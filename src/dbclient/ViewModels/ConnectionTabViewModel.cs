@@ -64,6 +64,7 @@ public class ConnectionTabViewModel : ViewModelBase
     }
 
     public string DisplayName => Config.ToString();
+    public bool IsSqlServer => Config.Type == ConnectionType.SqlServer;
     public IBrush TabColor { get; }
 
     public ConnectionTabViewModel(ConnectionConfig config)

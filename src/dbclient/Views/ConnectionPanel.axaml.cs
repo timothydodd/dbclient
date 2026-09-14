@@ -577,7 +577,32 @@ public partial class ConnectionPanel : UserControl
         catch (Exception ex) { AppLogger.Error("Export DACPAC failed", ex); }
     }
 
-    private async Task ImportDacpacAsync(ConnectionTabViewModel connTab, string database)
+    /// <summary>Connection-tab menu entry: lets a DACPAC be imported on a server that has no user databases yet.</summary>
+    private async void ImportDacpacTab_Click(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if ((sender as MenuItem)?.Tag is not ConnectionTabViewModel connTab) return;
+            if (TopLevel.GetTopLevel(this) is not Window window) return;
+
+            if (!SqlPackageService.IsAvailable)
+            {
+                await ConfirmDialog.ShowAsync(window, "SqlPackage not found",
+                    "DACPAC import needs the SqlPackage command-line tool.\n\n" + SqlPackageService.InstallHint, okText: "OK");
+                return;
+            }
+            if (connTab.Connection == null)
+            {
+                await ConfirmDialog.ShowAsync(window, "Not connected",
+                    "Connect to the server first, then import the DACPAC.", okText: "OK");
+                return;
+            }
+            await ImportDacpacAsync(connTab, null);
+        }
+        catch (Exception ex) { AppLogger.Error("Import DACPAC (tab) failed", ex); }
+    }
+
+    private async Task ImportDacpacAsync(ConnectionTabViewModel connTab, string? database)
     {
         try
         {
@@ -589,7 +614,10 @@ public partial class ConnectionPanel : UserControl
             if (!dlg.Confirmed || string.IsNullOrEmpty(dlg.FilePath) || string.IsNullOrEmpty(dlg.TargetDatabase)) return;
 
             var target = dlg.TargetDatabase;
-            var cs = await sql.GetExternalConnectionStringAsync(target);
+            var exists = connTab.AvailableDatabases.Any(d => string.Equals(d, target, StringComparison.OrdinalIgnoreCase));
+            // A database that doesn't exist yet can't be the Initial Catalog, so connect via master
+            // and let /TargetDatabaseName tell SqlPackage what to create.
+            var cs = await sql.GetExternalConnectionStringAsync(exists ? target : "master");
 
             if (dlg.ScriptOnly)
             {
@@ -620,7 +648,6 @@ public partial class ConnectionPanel : UserControl
                 return;
             }
 
-            var exists = connTab.AvailableDatabases.Any(d => string.Equals(d, target, StringComparison.OrdinalIgnoreCase));
             var message = exists
                 ? $"Publish {Path.GetFileName(dlg.FilePath)} to the EXISTING database \"{target}\"?\n\nObjects will be altered or dropped to match the DACPAC."
                 : $"Publish {Path.GetFileName(dlg.FilePath)} as a new database \"{target}\"?";
@@ -634,7 +661,10 @@ public partial class ConnectionPanel : UserControl
             if (success)
             {
                 await connTab.ReloadDatabasesAsync();
-                if (string.Equals(connTab.ActiveDatabase, target, StringComparison.OrdinalIgnoreCase))
+                // Refresh the schema if we just altered the active database, or if the server had
+                // no database selected yet (fresh server) so the new one becomes active.
+                if (string.IsNullOrEmpty(connTab.ActiveDatabase) ||
+                    string.Equals(connTab.ActiveDatabase, target, StringComparison.OrdinalIgnoreCase))
                     await connTab.SwitchDatabaseAsync(target, force: true);
             }
         }

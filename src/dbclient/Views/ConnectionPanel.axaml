@@ -81,6 +81,8 @@
                                     <Grid MinHeight="28" RowDefinitions="*,2">
                                         <Grid.ContextMenu>
                                             <ContextMenu>
+                                                <MenuItem Header="Import DACPAC..." Click="ImportDacpacTab_Click" Tag="{Binding}"
+                                                          IsVisible="{Binding IsSqlServer}"/>
                                                 <MenuItem Header="Close" Click="CloseConnectionTab_Click" Tag="{Binding}"/>
                                             </ContextMenu>
                                         </Grid.ContextMenu>
