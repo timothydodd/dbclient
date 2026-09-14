@@ -225,6 +225,12 @@ public partial class ConnectionPanel : UserControl
         if (connTab != null)
             connTab.ConnectionTree.CollectionChanged += OnTreeCollectionChanged;
 
+        if (_databasesBoundTab != null)
+            _databasesBoundTab.AvailableDatabases.CollectionChanged -= OnDatabasesChanged;
+        _databasesBoundTab = connTab;
+        if (connTab != null)
+            connTab.AvailableDatabases.CollectionChanged += OnDatabasesChanged;
+
         BindErrorOverlay(connTab);
         SyncFilterScopeUi();
     }
@@ -248,21 +254,57 @@ public partial class ConnectionPanel : UserControl
         UpdateOverlays();
     }
 
+    private ConnectionTabViewModel? _databasesBoundTab;
+
+    private void OnDatabasesChanged(object? sender, NotifyCollectionChangedEventArgs e) => UpdateOverlays();
+
     private void UpdateOverlays()
     {
         var panel = this.FindControl<Border>("ConnectionErrorPanel");
         var text = this.FindControl<TextBlock>("ConnectionErrorText");
         var tree = this.FindControl<TreeView>("SchemaTree");
         var loading = this.FindControl<Border>("SchemaLoadingPanel");
+        var empty = this.FindControl<Border>("NoDatabasesPanel");
         if (panel == null) return;
 
         var hasError = _errorBoundTab?.HasConnectionError == true;
         var isLoading = _errorBoundTab?.IsSchemaLoading == true && !hasError;
+        var isEmpty = !hasError && !isLoading
+                      && _errorBoundTab?.Connection != null
+                      && _errorBoundTab.AvailableDatabases.Count == 0;
 
         panel.IsVisible = hasError;
         if (loading != null) loading.IsVisible = isLoading;
-        if (tree != null) tree.IsVisible = !hasError && !isLoading;
+        if (empty != null)
+        {
+            empty.IsVisible = isEmpty;
+            if (isEmpty) UpdateNoDatabasesPanel(_errorBoundTab!);
+        }
+        if (tree != null) tree.IsVisible = !hasError && !isLoading && !isEmpty;
         if (text != null) text.Text = _errorBoundTab?.ConnectionError ?? "";
+    }
+
+    private void UpdateNoDatabasesPanel(ConnectionTabViewModel connTab)
+    {
+        var button = this.FindControl<Button>("NoDatabasesImportButton");
+        var hint = this.FindControl<TextBlock>("NoDatabasesHint");
+        var isSqlServer = connTab.Config.Type == ConnectionType.SqlServer;
+        var canImport = isSqlServer && SqlPackageService.IsAvailable;
+        if (button != null) button.IsVisible = isSqlServer;
+        if (button != null) button.IsEnabled = canImport;
+        if (hint != null)
+        {
+            hint.Text = !isSqlServer ? ""
+                : canImport ? "Creates a database from a .dacpac file using SqlPackage."
+                : "SqlPackage not found. " + SqlPackageService.InstallHint;
+            hint.IsVisible = hint.Text.Length > 0;
+        }
+    }
+
+    private void ImportDacpacEmpty_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_vm?.SelectedConnectionTab is { } connTab)
+            _ = ImportDacpacAsync(connTab, null);
     }
 
     private async void RetryConnection_Click(object? sender, RoutedEventArgs e)

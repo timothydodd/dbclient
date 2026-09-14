@@ -204,6 +204,28 @@
                     </TreeView.ItemTemplate>
                 </TreeView>
 
+                <!-- Empty server: connected but no user databases yet -->
+                <Border x:Name="NoDatabasesPanel" IsVisible="False"
+                        Background="{DynamicResource PanelBackground}" Padding="16,24">
+                    <StackPanel Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Top">
+                        <Path Data="M3 5a9 3 0 1 0 18 0a9 3 0 1 0-18 0 M3 5V19A9 3 0 0 0 21 19V5 M3 12A9 3 0 0 0 21 12"
+                              Stroke="{DynamicResource SecondaryText}" StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round"
+                              Stretch="Uniform" Width="28" Height="28" HorizontalAlignment="Center"/>
+                        <TextBlock Text="No databases" FontWeight="SemiBold" FontSize="13"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="This server has no user databases yet."
+                                   FontSize="11" Foreground="{DynamicResource SecondaryText}"
+                                   TextWrapping="Wrap" TextAlignment="Center"
+                                   HorizontalAlignment="Center" MaxWidth="240"/>
+                        <Button x:Name="NoDatabasesImportButton" Content="Import DACPAC..." Click="ImportDacpacEmpty_Click"
+                                HorizontalAlignment="Center" Padding="20,6"/>
+                        <TextBlock x:Name="NoDatabasesHint" FontSize="10"
+                                   Foreground="{DynamicResource SecondaryText}"
+                                   TextWrapping="Wrap" TextAlignment="Center"
+                                   HorizontalAlignment="Center" MaxWidth="240"/>
+                    </StackPanel>
+                </Border>
+
                 <!-- Skeleton loader: shown while connecting / refreshing schema -->
                 <Border x:Name="SchemaLoadingPanel" IsVisible="False"
                         Background="{DynamicResource PanelBackground}" Padding="10,10">
