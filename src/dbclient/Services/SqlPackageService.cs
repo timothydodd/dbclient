@@ -109,23 +109,25 @@ public static class SqlPackageService
         "/p:VerifyExtraction=False"
     ];
 
-    /// <summary>Arguments for publishing a .dacpac to <paramref name="targetDatabase"/> (created if it does not exist).</summary>
-    public static List<string> PublishArgs(string sourceFile, string connectionString, string targetDatabase, bool blockOnDataLoss) =>
+    /// <summary>
+    /// Arguments for publishing a .dacpac. The target database is the connection string's Initial Catalog
+    /// (SqlPackage creates it when it does not exist). /TargetDatabaseName cannot be combined with
+    /// /TargetConnectionString, so it is deliberately not passed.
+    /// </summary>
+    public static List<string> PublishArgs(string sourceFile, string connectionString, bool blockOnDataLoss) =>
     [
         "/Action:Publish",
         $"/SourceFile:{sourceFile}",
         $"/TargetConnectionString:{connectionString}",
-        $"/TargetDatabaseName:{targetDatabase}",
         $"/p:BlockOnPossibleDataLoss={(blockOnDataLoss ? "True" : "False")}"
     ];
 
-    /// <summary>Arguments for generating the deployment T-SQL script without applying it.</summary>
-    public static List<string> ScriptArgs(string sourceFile, string connectionString, string targetDatabase, string outputFile, bool blockOnDataLoss) =>
+    /// <summary>Arguments for generating the deployment T-SQL script without applying it. Target database comes from the connection string.</summary>
+    public static List<string> ScriptArgs(string sourceFile, string connectionString, string outputFile, bool blockOnDataLoss) =>
     [
         "/Action:Script",
         $"/SourceFile:{sourceFile}",
         $"/TargetConnectionString:{connectionString}",
-        $"/TargetDatabaseName:{targetDatabase}",
         $"/OutputPath:{outputFile}",
         $"/p:BlockOnPossibleDataLoss={(blockOnDataLoss ? "True" : "False")}"
     ];

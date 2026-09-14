@@ -657,9 +657,8 @@ public partial class ConnectionPanel : UserControl
 
             var target = dlg.TargetDatabase;
             var exists = connTab.AvailableDatabases.Any(d => string.Equals(d, target, StringComparison.OrdinalIgnoreCase));
-            // A database that doesn't exist yet can't be the Initial Catalog, so connect via master
-            // and let /TargetDatabaseName tell SqlPackage what to create.
-            var cs = await sql.GetExternalConnectionStringAsync(exists ? target : "master");
+            // The target database is the Initial Catalog; SqlPackage creates it when missing.
+            var cs = await sql.GetExternalConnectionStringAsync(target);
 
             if (dlg.ScriptOnly)
             {
@@ -676,7 +675,7 @@ public partial class ConnectionPanel : UserControl
 
                 var ok = await SqlPackageDialog.RunAsync(window, "Generate deployment script",
                     $"Scripting {Path.GetFileName(dlg.FilePath)} against {target}",
-                    SqlPackageService.ScriptArgs(dlg.FilePath, cs, target, scriptPath, dlg.BlockOnDataLoss));
+                    SqlPackageService.ScriptArgs(dlg.FilePath, cs, scriptPath, dlg.BlockOnDataLoss));
 
                 if (ok && File.Exists(scriptPath))
                 {
@@ -697,7 +696,7 @@ public partial class ConnectionPanel : UserControl
 
             var success = await SqlPackageDialog.RunAsync(window, "Import DACPAC",
                 $"Publishing {Path.GetFileName(dlg.FilePath)} to {target}",
-                SqlPackageService.PublishArgs(dlg.FilePath, cs, target, dlg.BlockOnDataLoss));
+                SqlPackageService.PublishArgs(dlg.FilePath, cs, dlg.BlockOnDataLoss));
 
             connTab.StatusText = success ? $"Imported {target}" : "DACPAC import failed";
             if (success)
