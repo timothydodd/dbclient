@@ -97,6 +97,7 @@
                                   HorizontalAlignment="Stretch">
                             <ComboBoxItem Content="SQL Login"/>
                             <ComboBoxItem Content="Azure (use az login)"/>
+                            <ComboBoxItem Content="Windows Authentication"/>
                         </ComboBox>
                     </StackPanel>
 

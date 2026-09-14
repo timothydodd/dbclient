@@ -223,7 +223,11 @@ public class SqlServerConnection : ConnectionBase
             Encrypt = Encrypt ? SqlConnectionEncryptOption.Mandatory : SqlConnectionEncryptOption.Optional
         };
 
-        if (AuthMode == SqlServerAuthMode.AzureDefault)
+        if (AuthMode == SqlServerAuthMode.WindowsIntegrated)
+        {
+            b.IntegratedSecurity = true;
+        }
+        else if (AuthMode == SqlServerAuthMode.AzureDefault)
         {
             // DefaultAzureCredential chain: env vars, managed identity, VS, VS Code, az CLI, etc.
             // Encryption is required for Azure SQL.
@@ -252,5 +256,7 @@ public class SqlServerConnection : ConnectionBase
 public enum SqlServerAuthMode
 {
     SqlLogin,
-    AzureDefault
+    AzureDefault,
+    /// <summary>Windows Authentication (Integrated Security) — the logged-in OS account. Windows only in practice.</summary>
+    WindowsIntegrated
 }

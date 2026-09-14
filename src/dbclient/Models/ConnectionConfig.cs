@@ -11,7 +11,8 @@ public class ConnectionConfig
     public string Port { get; set; } = "";
     public string Database { get; set; } = "";
 
-    // SQL Server auth: SqlLogin (default) or AzureDefault (uses az login / DefaultAzureCredential chain)
+    // SQL Server auth: SqlLogin (default), AzureDefault (az login / DefaultAzureCredential chain),
+    // or Windows (Integrated Security — the logged-in Windows account, for local servers)
     public SqlAuthMode AuthMode { get; set; } = SqlAuthMode.SqlLogin;
 
     // SQLite
@@ -53,5 +54,6 @@ public enum ConnectionType
 public enum SqlAuthMode
 {
     SqlLogin,
-    AzureDefault
+    AzureDefault,
+    Windows
 }
